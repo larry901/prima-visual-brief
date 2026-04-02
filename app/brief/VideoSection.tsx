@@ -41,8 +41,6 @@ export default function VideoSection({ type, detail, onChange }: VideoSectionPro
     onChange({ ...detail, [field]: value })
   }
 
-  const scriptMax = 500
-
   return (
     <div className="space-y-5 pt-2">
       <div>
@@ -104,17 +102,10 @@ export default function VideoSection({ type, detail, onChange }: VideoSectionPro
         </div>
       )}
       <div>
-        <label className="block text-sm font-medium mb-1.5">
-          <span className="flex justify-between">
-            <span>Script / talking points</span>
-            <span className="text-brand-muted font-normal">{detail.script.length}/{scriptMax}</span>
-          </span>
-        </label>
+        <label className="block text-sm font-medium mb-1.5">Script / talking points</label>
         <textarea
           value={detail.script}
-          onChange={(e) => {
-            if (e.target.value.length <= scriptMax) update('script', e.target.value)
-          }}
+          onChange={(e) => update('script', e.target.value)}
           rows={4}
           placeholder="Optional: paste or write your script, bullet points, or key talking points for this video..."
           className="input resize-none"

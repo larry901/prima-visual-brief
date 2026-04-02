@@ -7,7 +7,6 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
 
     const {
-      clientName,
       agentName,
       propertyAddress,
       shootDate,
@@ -19,16 +18,14 @@ export async function POST(req: NextRequest) {
       videoDetails,
       driveLink,
       assetNotes,
-      filePaths,
-      fileNames,
     } = body
 
-    if (!clientName || !agentName || !propertyAddress || !shootDate || !agentOnSite) {
+    if (!agentName || !propertyAddress || !shootDate || !agentOnSite) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
     const id = await insertBrief({
-      client_name: clientName,
+      client_name: '',
       agent_name: agentName,
       property_address: propertyAddress,
       shoot_date: shootDate,
@@ -40,12 +37,12 @@ export async function POST(req: NextRequest) {
       video_details: videoDetails || {},
       drive_link: driveLink || undefined,
       asset_notes: assetNotes || undefined,
-      file_paths: filePaths || [],
+      file_paths: [],
     })
 
     // Send email (don't block on failure)
     sendBriefEmail({
-      clientName,
+      clientName: '',
       agentName,
       propertyAddress,
       shootDate,
@@ -57,7 +54,7 @@ export async function POST(req: NextRequest) {
       videoDetails: videoDetails || {},
       driveLink,
       assetNotes,
-      fileNames: fileNames || [],
+      fileNames: [],
     }).catch((err) => console.error('Email send failed:', err))
 
     return NextResponse.json({ success: true, id })

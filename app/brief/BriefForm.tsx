@@ -1,7 +1,6 @@
 'use client'
 import { useState } from 'react'
 import VideoSection, { VideoDetailState } from './VideoSection'
-import FileUpload from './FileUpload'
 
 const VIDEO_TYPES = [
   'Listing Tour',
@@ -28,7 +27,6 @@ export default function BriefForm() {
   const [error, setError] = useState<string | null>(null)
 
   // Section 1
-  const [clientName, setClientName] = useState('')
   const [agentName, setAgentName] = useState('')
   const [propertyAddress, setPropertyAddress] = useState('')
   const [shootDate, setShootDate] = useState('')
@@ -44,7 +42,6 @@ export default function BriefForm() {
   const [videoDetails, setVideoDetails] = useState<Record<string, VideoDetailState>>({})
 
   // Section 4
-  const [files, setFiles] = useState<File[]>([])
   const [driveLink, setDriveLink] = useState('')
   const [assetNotes, setAssetNotes] = useState('')
 
@@ -69,23 +66,10 @@ export default function BriefForm() {
     setError(null)
 
     try {
-      // Upload files first
-      let filePaths: string[] = []
-      if (files.length > 0) {
-        const formData = new FormData()
-        files.forEach((file) => formData.append('files', file))
-        const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData })
-        if (!uploadRes.ok) throw new Error('File upload failed')
-        const uploadData = await uploadRes.json()
-        filePaths = uploadData.paths
-      }
-
-      // Submit brief
       const res = await fetch('/api/submit-brief', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          clientName,
           agentName,
           propertyAddress,
           shootDate,
@@ -97,8 +81,6 @@ export default function BriefForm() {
           videoDetails,
           driveLink,
           assetNotes,
-          filePaths,
-          fileNames: files.map((f) => f.name),
         }),
       })
 
@@ -139,12 +121,8 @@ export default function BriefForm() {
       {/* Header */}
       <header className="bg-white border-b border-brand-border sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div>
-            <div className="font-display text-xl font-semibold tracking-tight">Prima Visual</div>
-          </div>
-          <div className="text-right">
-            <div className="text-xs text-brand-muted">Complete 24 hrs before shoot</div>
-          </div>
+          <div className="font-display text-xl font-semibold tracking-tight">Prima Visual</div>
+          <div className="text-xs text-brand-muted">Complete 24 hrs before shoot</div>
         </div>
       </header>
 
@@ -161,33 +139,18 @@ export default function BriefForm() {
           {/* Section 1: Shoot Info */}
           <section className="card p-6 space-y-4">
             <div className="section-label">01 — Shoot Info</div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1.5">
-                  Client name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  required
-                  type="text"
-                  value={clientName}
-                  onChange={(e) => setClientName(e.target.value)}
-                  placeholder="Jane Smith"
-                  className="input"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5">
-                  Agent name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  required
-                  type="text"
-                  value={agentName}
-                  onChange={(e) => setAgentName(e.target.value)}
-                  placeholder="John Agent"
-                  className="input"
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-medium mb-1.5">
+                Agent name <span className="text-red-500">*</span>
+              </label>
+              <input
+                required
+                type="text"
+                value={agentName}
+                onChange={(e) => setAgentName(e.target.value)}
+                placeholder="John Agent"
+                className="input"
+              />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1.5">
@@ -314,10 +277,6 @@ export default function BriefForm() {
           {/* Section 4: Files & Assets */}
           <section className="card p-6 space-y-4">
             <div className="section-label">04 — Files & Assets</div>
-            <div>
-              <label className="block text-sm font-medium mb-2">Upload files</label>
-              <FileUpload files={files} onChange={setFiles} />
-            </div>
             <div>
               <label className="block text-sm font-medium mb-1.5">Dropbox / Google Drive link</label>
               <input
