@@ -1,6 +1,6 @@
 # Prima Visual Brief
 
-A full-stack Next.js 14 web application for collecting pre-shoot creative briefs from real estate clients. Clients fill out a detailed form covering shoot logistics, video types, music preferences, inspiration references, and file uploads. Submissions are stored in a local SQLite database and emailed to the team via Resend.
+A full-stack Next.js 14 web application for collecting pre-shoot creative briefs from real estate clients. Clients fill out a detailed form covering shoot logistics, video types, music preferences, inspiration references, and file uploads. Submissions are stored in a Neon Postgres database (Vercel's native PostgreSQL offering) and emailed to the team via Resend.
 
 ## Features
 
@@ -16,6 +16,7 @@ A full-stack Next.js 14 web application for collecting pre-shoot creative briefs
 
 - Node.js 18 or later
 - npm 9 or later
+- A Neon Postgres database (free tier available at https://neon.tech, or via Vercel's Storage tab)
 
 ## Installation
 
@@ -34,6 +35,8 @@ cp .env.local.example .env.local
 
 | Variable | Required | Description |
 |---|---|---|
+| `POSTGRES_URL` | Yes | Neon (or any PostgreSQL) connection string with `?sslmode=require` |
+| `POSTGRES_URL_NON_POOLING` | Recommended | Direct (non-pooled) connection string — used for migrations |
 | `SPOTIFY_CLIENT_ID` | Yes | Spotify Developer App client ID |
 | `SPOTIFY_CLIENT_SECRET` | Yes | Spotify Developer App client secret |
 | `EMAIL_API_KEY` | Yes | Resend API key (from resend.com) |
@@ -44,7 +47,23 @@ cp .env.local.example .env.local
 | `AWS_REGION` | No | AWS region (default: `us-east-1`) |
 | `AWS_ENDPOINT_URL` | No | Custom S3 endpoint for non-AWS providers (e.g. Cloudflare R2, MinIO) |
 
-### Getting API Keys
+### Setting up Neon Postgres
+
+**Option A — Via Vercel (recommended for Vercel deployments):**
+1. Open your project in the Vercel dashboard
+2. Go to **Storage → Create Database → Neon**
+3. After creation, open the database and click the **`.env.local`** tab
+4. Copy the generated variables into your local `.env.local`
+
+**Option B — Direct Neon account:**
+1. Sign up at https://neon.tech
+2. Create a new project and database
+3. Copy the **Connection string** from the dashboard
+4. Set it as `POSTGRES_URL` in `.env.local`
+
+The `briefs` table is created automatically on the first request — no manual migrations needed.
+
+### Getting Other API Keys
 
 **Spotify:** Create an app at https://developer.spotify.com/dashboard. Use the Client ID and Client Secret. The app uses the Client Credentials flow (no user auth required).
 
@@ -60,8 +79,6 @@ npm run dev
 - Dashboard login: http://localhost:3000/dashboard
 - Dashboard briefs list: http://localhost:3000/dashboard/briefs
 
-The SQLite database (`prima-brief.db`) is created automatically in the project root on first run.
-
 File uploads go to `public/uploads/` by default.
 
 ## Building for Production
@@ -71,29 +88,21 @@ npm run build
 npm start
 ```
 
-## Deploying
+## Deploying to Vercel
 
-### Important: SQLite Limitations on Serverless Platforms
+1. Push your code to a GitHub repository
+2. Import it in the Vercel dashboard
+3. Go to **Storage** and attach or create a Neon Postgres database — Vercel will auto-inject `POSTGRES_URL` and related variables
+4. Add the remaining environment variables in **Settings → Environment Variables**:
+   - `SPOTIFY_CLIENT_ID`
+   - `SPOTIFY_CLIENT_SECRET`
+   - `EMAIL_API_KEY`
+   - `DASHBOARD_PASSWORD`
+5. Deploy
 
-SQLite stores data as a local file on disk. This works perfectly for local development and traditional VPS/VM deployments, but **does not work on serverless platforms like Vercel** because:
+### File Uploads on Vercel
 
-- Each serverless function invocation may run on a different container
-- The filesystem is ephemeral and does not persist between deployments or invocations
-
-**Recommended alternatives for production:**
-
-1. **Turso** (libSQL, SQLite-compatible): https://turso.tech — swap `better-sqlite3` for `@libsql/client`
-2. **PlanetScale** (MySQL-compatible): https://planetscale.com — swap for `mysql2` or Drizzle ORM
-3. **Supabase** (PostgreSQL): https://supabase.com — swap for `pg` or Prisma
-4. **Railway / Render / Fly.io** — traditional VM-style hosting where SQLite works fine as-is
-
-### Deploying to a VPS (Railway, Render, Fly.io, DigitalOcean)
-
-These platforms give you a persistent filesystem, so SQLite works without changes. Set all environment variables in your platform's dashboard and deploy normally.
-
-### File Uploads on Serverless
-
-If deploying to a serverless platform, local file uploads will not persist. Set the `STORAGE_BUCKET` and AWS credentials to use S3-compatible storage:
+Vercel has an ephemeral filesystem — locally uploaded files will not persist between deployments or function invocations. Configure S3-compatible storage for production:
 
 - **AWS S3**: Set `STORAGE_BUCKET`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`
 - **Cloudflare R2**: Set all the above plus `AWS_ENDPOINT_URL=https://<account-id>.r2.cloudflarestorage.com`
@@ -113,11 +122,11 @@ app/
     dashboard/     — Auth + brief data endpoints
     spotify/       — Spotify track suggestions
 lib/
-  db.ts            — SQLite database singleton
+  db.ts            — Neon Postgres queries (@neondatabase/serverless)
   email.ts         — Resend email templates
   spotify.ts       — Spotify Client Credentials API
   storage.ts       — Local disk / S3 file storage
   auth.ts          — Cookie-based session helpers
 public/
-  uploads/         — Local file upload directory
+  uploads/         — Local file upload directory (dev only)
 ```

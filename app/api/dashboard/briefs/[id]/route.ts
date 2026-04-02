@@ -15,7 +15,7 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const brief = getBriefById(Number(params.id))
+  const brief = await getBriefById(Number(params.id))
   if (!brief) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   return NextResponse.json({ brief })

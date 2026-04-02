@@ -33,10 +33,10 @@ function isImagePath(p: string) {
   return /\.(png|jpe?g|gif|webp|svg)$/i.test(p)
 }
 
-export default function BriefDetailPage({ params }: { params: { id: string } }) {
+export default async function BriefDetailPage({ params }: { params: { id: string } }) {
   if (!isAuthenticated()) redirect('/dashboard')
 
-  const brief = getBriefById(Number(params.id))
+  const brief = await getBriefById(Number(params.id))
   if (!brief) notFound()
 
   const videoTypes: string[] = JSON.parse(brief.video_types || '[]')

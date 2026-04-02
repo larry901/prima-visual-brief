@@ -17,10 +17,10 @@ function formatDate(dateStr: string) {
   })
 }
 
-export default function BriefsListPage() {
+export default async function BriefsListPage() {
   if (!isAuthenticated()) redirect('/dashboard')
 
-  const briefs = getAllBriefs()
+  const briefs = await getAllBriefs()
 
   return (
     <div className="min-h-screen bg-brand-bg">

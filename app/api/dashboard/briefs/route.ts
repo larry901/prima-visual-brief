@@ -12,6 +12,6 @@ export async function GET(_req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const briefs = getAllBriefs()
+  const briefs = await getAllBriefs()
   return NextResponse.json({ briefs })
 }

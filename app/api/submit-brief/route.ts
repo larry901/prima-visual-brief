@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    const id = insertBrief({
+    const id = await insertBrief({
       client_name: clientName,
       agent_name: agentName,
       property_address: propertyAddress,
