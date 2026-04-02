@@ -29,6 +29,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export const config = {
-  api: { bodyParser: false },
-}
+// App Router handles multipart/form-data natively — no bodyParser config needed.
+// Raise the default 4 MB body limit so clients can upload larger files.
+export const maxDuration = 60 // seconds (Vercel Pro/Enterprise; ignored on Hobby)
+
