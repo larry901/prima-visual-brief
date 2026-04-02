@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(export PATH=\"/usr/local/bin:/opt/homebrew/bin:$PATH\")",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(command -v node)",
+      "Bash(command -v npm)",
+      "Bash(command -v npx)",
+      "Read(//usr/local/lib/node_modules/npm/bin/**)",
+      "Read(//Users/larryayala/.nvm/versions/**)",
+      "Read(//usr/local/bin/**)",
+      "Read(//opt/homebrew/bin/**)",
+      "Read(//usr/bin/**)",
+      "Bash(/usr/local/bin/node --version)"
+    ]
+  }
+}
