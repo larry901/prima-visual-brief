@@ -160,7 +160,7 @@ export default function BriefForm() {
                 type="text"
                 value={propertyAddress}
                 onChange={(e) => setPropertyAddress(e.target.value)}
-                placeholder="123 Main St, Beverly Hills, CA 90210"
+                placeholder="3500 Inwood Dr, Houston, TX 77019"
                 className="input"
               />
             </div>
