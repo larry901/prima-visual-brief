@@ -61,8 +61,16 @@ export default function BriefForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
     setError(null)
+
+    if (selectedVideoTypes.length === 0) {
+      setError('Please select at least one video type in Section 3 before submitting.')
+      // Scroll the video types card into view so the user sees what's missing.
+      document.getElementById('video-types-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      return
+    }
+
+    setLoading(true)
 
     try {
       const res = await fetch('/api/submit-brief', {
@@ -233,9 +241,13 @@ export default function BriefForm() {
 
           {/* Section 3: Videos */}
           <section className="space-y-4">
-            <div className="card p-6">
-              <div className="section-label">03 — Videos</div>
-              <p className="text-sm text-brand-muted mb-4">Select all video types that apply to your shoot.</p>
+            <div id="video-types-card" className="card p-6 scroll-mt-24">
+              <div className="section-label">
+                03 — Videos <span className="text-red-500 normal-case">*</span>
+              </div>
+              <p className="text-sm text-brand-muted mb-4">
+                Select all video types that apply to your shoot &mdash; at least one is required.
+              </p>
               <div className="flex flex-wrap gap-2">
                 {VIDEO_TYPES.map((type) => {
                   const active = selectedVideoTypes.includes(type)
