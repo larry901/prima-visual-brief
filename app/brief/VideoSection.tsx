@@ -1,14 +1,6 @@
 'use client'
-import TagPicker from './TagPicker'
 import InspirationLinks from './InspirationLinks'
 import SuggestedSongs, { TrackRef } from './SuggestedSongs'
-
-const TONE_OPTIONS = [
-  'Professional / Polished',
-  'Warm / Conversational',
-  'Bold / Confident',
-  'Luxurious / Aspirational',
-]
 
 export interface VideoDetailState {
   highlights: string
@@ -18,7 +10,6 @@ export interface VideoDetailState {
   inspirationLinks: string[]
   inspirationThoughts: string
   script: string
-  toneOfVoice: string
 }
 
 interface VideoSectionProps {
@@ -123,15 +114,6 @@ export default function VideoSection({ type, detail, onChange }: VideoSectionPro
           />
         </div>
       )}
-      <div>
-        <label className="block text-sm font-medium mb-2">Tone of voice</label>
-        <TagPicker
-          options={TONE_OPTIONS}
-          selected={detail.toneOfVoice ? [detail.toneOfVoice] : []}
-          onChange={(v) => update('toneOfVoice', v[0] || '')}
-          multi={false}
-        />
-      </div>
     </div>
   )
 }

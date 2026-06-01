@@ -175,16 +175,6 @@ export default async function BriefDetailPage({ params }: { params: { id: string
                           </dd>
                         </div>
                       )}
-                      {detail.toneOfVoice && (
-                        <div>
-                          <dt className="text-brand-muted mb-1">Tone of voice</dt>
-                          <dd>
-                            <span className="bg-gray-100 text-brand-dark text-xs px-2.5 py-1 rounded-full">
-                              {detail.toneOfVoice}
-                            </span>
-                          </dd>
-                        </div>
-                      )}
                     </dl>
 
                     {/* Client's selected reference tracks */}

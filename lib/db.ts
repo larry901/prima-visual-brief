@@ -30,7 +30,6 @@ export interface VideoDetail {
   inspirationLinks: string[]
   inspirationThoughts: string
   script: string
-  toneOfVoice: string
 }
 
 export interface BriefRow {

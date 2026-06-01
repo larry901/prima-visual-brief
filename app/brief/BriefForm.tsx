@@ -18,7 +18,6 @@ const defaultVideoDetail = (): VideoDetailState => ({
   inspirationLinks: [],
   inspirationThoughts: '',
   script: '',
-  toneOfVoice: '',
 })
 
 export default function BriefForm() {

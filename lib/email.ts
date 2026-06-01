@@ -37,7 +37,6 @@ export async function sendBriefEmail(data: BriefEmailData) {
         ${detail.inspirationLinks?.length ? `<p><strong>Inspiration Links:</strong><br>${detail.inspirationLinks.map((l) => `<a href="${l}">${l}</a>`).join('<br>')}</p>` : ''}
         ${detail.inspirationThoughts ? `<p><strong>What they love about examples:</strong> ${detail.inspirationThoughts}</p>` : ''}
         ${detail.script ? `<p><strong>Script / Talking Points:</strong> ${detail.script}</p>` : ''}
-        ${detail.toneOfVoice ? `<p><strong>Tone of Voice:</strong> ${detail.toneOfVoice}</p>` : ''}
       </div>
     `
   }).join('')

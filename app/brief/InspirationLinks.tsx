@@ -34,7 +34,7 @@ export default function InspirationLinks({ links, onChange }: InspirationLinksPr
               addLink()
             }
           }}
-          placeholder="Paste a URL and press Enter or Add"
+          placeholder="Paste Instagram URL"
           className="input flex-1"
         />
         <button type="button" onClick={addLink} className="btn-secondary px-4 py-3 whitespace-nowrap">
