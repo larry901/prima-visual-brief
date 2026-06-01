@@ -13,7 +13,19 @@
       "Read(//usr/local/bin/**)",
       "Read(//opt/homebrew/bin/**)",
       "Read(//usr/bin/**)",
-      "Bash(/usr/local/bin/node --version)"
+      "Bash(/usr/local/bin/node --version)",
+      "Bash(ls -la .env.local)",
+      "Bash(grep -c SPOTIFY .env.local)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(git config *)",
+      "Bash(git remote *)",
+      "Bash(git credential-osxkeychain *)",
+      "Bash(git ls-remote *)",
+      "WebFetch(domain:open.spotify.com)",
+      "Bash(rm -f app/api/auth/spotify/login/route.ts app/api/auth/spotify/callback/route.ts)",
+      "Bash(rmdir app/api/auth/spotify/login app/api/auth/spotify/callback app/api/auth/spotify app/api/auth)"
     ]
   }
 }
