@@ -95,7 +95,10 @@ async function fetchAllPlaylistTracks(playlistId: string): Promise<SpotifyTrack[
       headers: { Authorization: `Bearer ${token}` },
       cache: 'no-store',
     })
-    if (!res.ok) throw new Error(`Spotify playlist fetch failed: ${res.status}`)
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      throw new Error(`Spotify playlist fetch failed: ${res.status} body=${body.slice(0, 400)}`)
+    }
     const data = await res.json()
 
     for (const item of data.items || []) {
