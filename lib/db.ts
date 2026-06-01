@@ -13,10 +13,19 @@ function getSql() {
 // Types
 // ---------------------------------------------------------------------------
 
+export interface TrackRef {
+  id: string
+  name: string
+  artist: string
+  albumArt: string | null
+  previewUrl: string | null
+  spotifyUrl: string
+}
+
 export interface VideoDetail {
   highlights: string
   avoid: string
-  musicVibes: string[]
+  selectedTracks: TrackRef[]
   referenceArtist: string
   inspirationLinks: string[]
   inspirationThoughts: string

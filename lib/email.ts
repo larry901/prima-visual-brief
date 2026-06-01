@@ -27,8 +27,13 @@ export async function sendBriefEmail(data: BriefEmailData) {
         <h3 style="margin: 0 0 12px; color: #1A1A1A; font-size: 16px;">${type}</h3>
         ${detail.highlights ? `<p><strong>Highlights:</strong> ${detail.highlights}</p>` : ''}
         ${detail.avoid ? `<p><strong>Avoid:</strong> ${detail.avoid}</p>` : ''}
-        ${detail.musicVibes?.length ? `<p><strong>Music Vibe:</strong> ${detail.musicVibes.join(', ')}</p>` : ''}
-        ${detail.referenceArtist ? `<p><strong>Reference Artist/Song:</strong> ${detail.referenceArtist}</p>` : ''}
+        ${detail.selectedTracks?.length ? `
+          <p style="margin-bottom: 4px;"><strong>Reference tracks (from playlist):</strong></p>
+          <ul style="margin-top: 0;">
+            ${detail.selectedTracks.map((t) => `<li><a href="${t.spotifyUrl}" style="color: #1A1A1A;">${t.name}</a> &mdash; ${t.artist}</li>`).join('')}
+          </ul>
+        ` : ''}
+        ${detail.referenceArtist ? `<p><strong>Reference artist/song (client-typed):</strong> ${detail.referenceArtist}</p>` : ''}
         ${detail.inspirationLinks?.length ? `<p><strong>Inspiration Links:</strong><br>${detail.inspirationLinks.map((l) => `<a href="${l}">${l}</a>`).join('<br>')}</p>` : ''}
         ${detail.inspirationThoughts ? `<p><strong>What they love about examples:</strong> ${detail.inspirationThoughts}</p>` : ''}
         ${detail.script ? `<p><strong>Script / Talking Points:</strong> ${detail.script}</p>` : ''}

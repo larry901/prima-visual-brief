@@ -39,13 +39,9 @@ cp .env.local.example .env.local
 | `POSTGRES_URL_NON_POOLING` | Recommended | Direct (non-pooled) connection string — used for migrations |
 | `SPOTIFY_CLIENT_ID` | Yes | Spotify Developer App client ID |
 | `SPOTIFY_CLIENT_SECRET` | Yes | Spotify Developer App client secret |
+| `SPOTIFY_PLAYLIST_ID` | Yes | ID of the public Spotify playlist that powers "Reference songs" on the brief form. Grab it from the playlist URL: `open.spotify.com/playlist/<THIS_PART>?si=...` |
 | `EMAIL_API_KEY` | Yes | Resend API key (from resend.com) |
 | `DASHBOARD_PASSWORD` | Yes | Password to access the /dashboard route |
-| `STORAGE_BUCKET` | No | S3 bucket name — if set, uploads go to S3 instead of local disk |
-| `AWS_ACCESS_KEY_ID` | No | AWS (or S3-compatible) access key ID |
-| `AWS_SECRET_ACCESS_KEY` | No | AWS (or S3-compatible) secret access key |
-| `AWS_REGION` | No | AWS region (default: `us-east-1`) |
-| `AWS_ENDPOINT_URL` | No | Custom S3 endpoint for non-AWS providers (e.g. Cloudflare R2, MinIO) |
 
 ### Setting up Neon Postgres
 

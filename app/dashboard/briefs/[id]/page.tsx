@@ -3,7 +3,7 @@ import { redirect, notFound } from 'next/navigation'
 import { getBriefById, VideoDetail } from '@/lib/db'
 import Link from 'next/link'
 import Image from 'next/image'
-import SpotifyTracks from '@/app/dashboard/SpotifyTracks'
+import TrackList from '@/app/dashboard/TrackList'
 import LogoutButton from '@/app/dashboard/LogoutButton'
 
 function isAuthenticated() {
@@ -17,16 +17,6 @@ function formatDate(dateStr: string) {
     month: 'short',
     day: 'numeric',
   })
-}
-
-const MUSIC_LABEL: Record<string, string> = {
-  'Cinematic / Orchestral': '🎼',
-  'Modern Luxury': '✨',
-  'Chill / Lo-fi': '🎧',
-  'Upbeat / Energetic': '⚡',
-  'Acoustic / Warm': '🎸',
-  'R&B / Soul': '🎵',
-  'No Music': '🔇',
 }
 
 function isImagePath(p: string) {
@@ -125,10 +115,7 @@ export default async function BriefDetailPage({ params }: { params: { id: string
             <div className="section-label px-0">Video Sections</div>
             {videoTypes.map((type) => {
               const detail = videoDetails[type] || ({} as Partial<VideoDetail>)
-              const hasMusic =
-                detail.musicVibes &&
-                detail.musicVibes.length > 0 &&
-                !(detail.musicVibes.length === 1 && detail.musicVibes[0] === 'No Music')
+              const tracks = detail.selectedTracks || []
               return (
                 <div key={type} className="card overflow-hidden">
                   <div className="px-6 py-4 border-b border-brand-border bg-gray-50">
@@ -148,24 +135,9 @@ export default async function BriefDetailPage({ params }: { params: { id: string
                           <dd className="font-medium">{detail.avoid}</dd>
                         </div>
                       )}
-                      {detail.musicVibes && detail.musicVibes.length > 0 && (
-                        <div>
-                          <dt className="text-brand-muted mb-2">Music vibe</dt>
-                          <dd className="flex flex-wrap gap-1.5">
-                            {detail.musicVibes.map((v) => (
-                              <span
-                                key={v}
-                                className="bg-gray-100 text-brand-dark text-xs px-2.5 py-1 rounded-full"
-                              >
-                                {MUSIC_LABEL[v] || ''} {v}
-                              </span>
-                            ))}
-                          </dd>
-                        </div>
-                      )}
                       {detail.referenceArtist && (
                         <div>
-                          <dt className="text-brand-muted mb-1">Reference artist / song</dt>
+                          <dt className="text-brand-muted mb-1">Reference artist / song (client-typed)</dt>
                           <dd className="font-medium">{detail.referenceArtist}</dd>
                         </div>
                       )}
@@ -215,11 +187,13 @@ export default async function BriefDetailPage({ params }: { params: { id: string
                       )}
                     </dl>
 
-                    {/* Spotify Suggestions */}
-                    {hasMusic && (
+                    {/* Client's selected reference tracks */}
+                    {tracks.length > 0 && (
                       <div className="pt-4 border-t border-brand-border">
-                        <div className="text-sm font-medium mb-3">Suggested Tracks</div>
-                        <SpotifyTracks vibes={detail.musicVibes || []} />
+                        <div className="text-sm font-medium mb-3">
+                          Reference tracks <span className="text-brand-muted font-normal text-xs">— selected by client</span>
+                        </div>
+                        <TrackList tracks={tracks} />
                       </div>
                     )}
                   </div>

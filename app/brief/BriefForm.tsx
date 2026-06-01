@@ -13,7 +13,7 @@ const VIDEO_TYPES = [
 const defaultVideoDetail = (): VideoDetailState => ({
   highlights: '',
   avoid: '',
-  musicVibes: [],
+  selectedTracks: [],
   referenceArtist: '',
   inspirationLinks: [],
   inspirationThoughts: '',
