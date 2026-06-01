@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 export interface TrackRef {
   id: string
@@ -19,8 +19,6 @@ export default function SuggestedSongs({ selected, onChange }: SuggestedSongsPro
   const [tracks, setTracks] = useState<TrackRef[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [playingId, setPlayingId] = useState<string | null>(null)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const load = async () => {
     setLoading(true)
@@ -39,30 +37,7 @@ export default function SuggestedSongs({ selected, onChange }: SuggestedSongsPro
 
   useEffect(() => {
     load()
-    return () => {
-      audioRef.current?.pause()
-      audioRef.current = null
-    }
   }, [])
-
-  const togglePreview = (track: TrackRef) => {
-    if (!track.previewUrl) return
-    if (playingId === track.id) {
-      audioRef.current?.pause()
-      audioRef.current = null
-      setPlayingId(null)
-      return
-    }
-    audioRef.current?.pause()
-    const audio = new Audio(track.previewUrl)
-    audio.play().catch(() => setPlayingId(null))
-    audio.onended = () => {
-      setPlayingId(null)
-      audioRef.current = null
-    }
-    audioRef.current = audio
-    setPlayingId(track.id)
-  }
 
   const toggleSelect = (track: TrackRef) => {
     const exists = selected.find((t) => t.id === track.id)
@@ -73,15 +48,15 @@ export default function SuggestedSongs({ selected, onChange }: SuggestedSongsPro
     }
   }
 
-  // Tracks the user selected in earlier shuffles but aren't in the current batch
+  // Tracks the user selected in previous shuffles that aren't in the current batch.
   const selectedNotInBatch = selected.filter((s) => !tracks.find((t) => t.id === s.id))
 
   return (
     <div className="space-y-3">
       <div className="flex items-baseline justify-between gap-3">
         <p className="text-xs text-brand-muted flex-1">
-          Tap any songs that match the vibe you want. Reference only &mdash; not necessarily
-          what we&apos;ll use.
+          Press play to preview. Tap &ldquo;Add to brief&rdquo; on any songs that match the vibe
+          you want. Reference only &mdash; not necessarily what we&apos;ll use.
         </p>
         <button
           type="button"
@@ -95,72 +70,50 @@ export default function SuggestedSongs({ selected, onChange }: SuggestedSongsPro
 
       {error && <p className="text-xs text-red-600">{error}</p>}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {(loading && tracks.length === 0
           ? Array.from({ length: 4 }).map(() => null)
           : tracks
         ).map((track, i) => {
           if (!track) {
-            return <div key={`skel-${i}`} className="h-[60px] rounded-lg bg-gray-100 animate-pulse" />
+            return (
+              <div
+                key={`skel-${i}`}
+                className="h-[124px] rounded-xl bg-gray-100 animate-pulse"
+              />
+            )
           }
           const isSelected = !!selected.find((s) => s.id === track.id)
           return (
             <div
               key={track.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => toggleSelect(track)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  toggleSelect(track)
-                }
-              }}
-              className={`flex items-center gap-3 rounded-lg p-2.5 border transition-colors cursor-pointer select-none ${
+              className={`rounded-xl overflow-hidden border transition-all ${
                 isSelected
-                  ? 'bg-brand-dark/5 border-brand-dark'
-                  : 'bg-white border-brand-border hover:border-brand-dark/30'
+                  ? 'border-brand-dark ring-2 ring-brand-dark/10'
+                  : 'border-brand-border'
               }`}
             >
-              {track.albumArt ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={track.albumArt}
-                  alt=""
-                  className="w-11 h-11 rounded flex-shrink-0 object-cover"
-                />
-              ) : (
-                <div className="w-11 h-11 bg-gray-200 rounded flex-shrink-0" />
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{track.name}</p>
-                <p className="text-xs text-brand-muted truncate">{track.artist}</p>
-              </div>
-              {track.previewUrl && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    togglePreview(track)
-                  }}
-                  className="w-7 h-7 rounded-full bg-brand-dark text-white flex items-center justify-center text-[10px] flex-shrink-0 hover:bg-brand-dark/80"
-                  aria-label={playingId === track.id ? 'Pause preview' : 'Play preview'}
-                >
-                  {playingId === track.id ? '■' : '▶'}
-                </button>
-              )}
-              <span
-                className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                  isSelected ? 'bg-brand-dark border-brand-dark' : 'border-brand-border'
+              <iframe
+                src={`https://open.spotify.com/embed/track/${track.id}?utm_source=generator`}
+                width="100%"
+                height="80"
+                style={{ border: 0 }}
+                loading="lazy"
+                allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                title={`${track.name} by ${track.artist}`}
+                className="block"
+              />
+              <button
+                type="button"
+                onClick={() => toggleSelect(track)}
+                className={`w-full px-3 py-2 text-xs font-medium border-t transition-colors ${
+                  isSelected
+                    ? 'bg-brand-dark text-white border-brand-dark'
+                    : 'bg-white text-brand-dark border-brand-border hover:bg-gray-50'
                 }`}
-                aria-hidden="true"
               >
-                {isSelected && (
-                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                  </svg>
-                )}
-              </span>
+                {isSelected ? '✓ Selected' : '+ Add to brief'}
+              </button>
             </div>
           )
         })}
