@@ -23,14 +23,29 @@ let tokenExpiry = 0
 const PLAYLIST_CACHE_TTL_MS = 5 * 60 * 1000
 let playlistCache: { tracks: SpotifyTrack[]; expiresAt: number } | null = null
 
+// Uses the OAuth refresh-token flow so the access token is associated with
+// the playlist owner's account. This is required because Spotify apps in
+// Development Mode reject Client Credentials access to user playlists (403).
+// Complete the one-time auth at /api/auth/spotify/login to obtain the refresh token.
 async function getAccessToken(): Promise<string> {
   if (accessToken && Date.now() < tokenExpiry) return accessToken
 
   const clientId = process.env.SPOTIFY_CLIENT_ID
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET
+  const refreshToken = process.env.SPOTIFY_REFRESH_TOKEN
   if (!clientId || !clientSecret) {
     throw new Error('SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET not configured')
   }
+  if (!refreshToken) {
+    throw new Error(
+      'SPOTIFY_REFRESH_TOKEN not configured — visit /api/auth/spotify/login to obtain one'
+    )
+  }
+
+  const body = new URLSearchParams({
+    grant_type: 'refresh_token',
+    refresh_token: refreshToken,
+  })
 
   const res = await fetch('https://accounts.spotify.com/api/token', {
     method: 'POST',
@@ -38,10 +53,13 @@ async function getAccessToken(): Promise<string> {
       'Content-Type': 'application/x-www-form-urlencoded',
       Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
     },
-    body: 'grant_type=client_credentials',
+    body: body.toString(),
     cache: 'no-store',
   })
-  if (!res.ok) throw new Error(`Spotify token request failed: ${res.status}`)
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`Spotify token refresh failed: ${res.status} ${text}`)
+  }
 
   const data = await res.json()
   accessToken = data.access_token
