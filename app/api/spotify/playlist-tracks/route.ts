@@ -11,8 +11,17 @@ export async function GET() {
     return NextResponse.json({ tracks })
   } catch (err) {
     console.error('Playlist tracks fetch failed:', err)
+    const detail = err instanceof Error ? err.message : String(err)
+    const playlistIdSet = !!process.env.SPOTIFY_PLAYLIST_ID
+    const clientIdSet = !!process.env.SPOTIFY_CLIENT_ID
+    const clientSecretSet = !!process.env.SPOTIFY_CLIENT_SECRET
     return NextResponse.json(
-      { tracks: [], error: 'Failed to load track suggestions' },
+      {
+        tracks: [],
+        error: 'Failed to load track suggestions',
+        detail,
+        envCheck: { playlistIdSet, clientIdSet, clientSecretSet },
+      },
       { status: 500 }
     )
   }
