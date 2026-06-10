@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import TrackList from '@/app/dashboard/TrackList'
 import LogoutButton from '@/app/dashboard/LogoutButton'
+import CopyForNotion from '@/app/dashboard/CopyForNotion'
 
 function isAuthenticated() {
   const cookieStore = cookies()
@@ -50,21 +51,31 @@ export default async function BriefDetailPage({ params }: { params: { id: string
           >
             &larr; Back to all briefs
           </Link>
-          <h1 className="font-display text-3xl font-semibold">{brief.client_name}</h1>
-          <p className="text-brand-muted mt-1">{brief.property_address}</p>
-          <p className="text-xs text-brand-muted mt-1">
-            Submitted {formatDate(brief.submitted_at)}
-          </p>
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <h1 className="font-display text-3xl font-semibold">{brief.agent_name}</h1>
+              <p className="text-brand-muted mt-1">{brief.property_address}</p>
+              <p className="text-xs text-brand-muted mt-1">
+                Submitted {formatDate(brief.submitted_at)}
+              </p>
+            </div>
+            <CopyForNotion
+              agentName={brief.agent_name}
+              propertyAddress={brief.property_address}
+              shootDate={brief.shoot_date}
+              submittedAt={brief.submitted_at}
+              videoTypes={videoTypes}
+              videoDetails={videoDetails}
+              driveLink={brief.drive_link}
+              assetNotes={brief.asset_notes}
+            />
+          </div>
         </div>
 
         {/* Shoot Info */}
         <section className="card p-6">
           <div className="section-label">Shoot Info</div>
           <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-            <div>
-              <dt className="text-brand-muted">Client</dt>
-              <dd className="font-medium mt-0.5">{brief.client_name}</dd>
-            </div>
             <div>
               <dt className="text-brand-muted">Agent</dt>
               <dd className="font-medium mt-0.5">{brief.agent_name}</dd>

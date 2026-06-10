@@ -58,7 +58,7 @@ export default async function BriefsListPage() {
                     <div className="flex items-start gap-3">
                       <div>
                         <p className="font-medium group-hover:text-brand-dark">
-                          {brief.client_name}
+                          {brief.agent_name}
                         </p>
                         <p className="text-sm text-brand-muted truncate">{brief.property_address}</p>
                       </div>
