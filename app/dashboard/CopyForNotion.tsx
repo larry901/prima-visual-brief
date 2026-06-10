@@ -56,25 +56,28 @@ function buildMarkdown(props: CopyForNotionProps): string {
     if (d.avoid) {
       out.push(`**Avoid:** ${d.avoid}`)
     }
+    // Non-bullet fields go before any bullet list so Notion doesn't nest them
+    // under the last bullet when the markdown is pasted.
+    if (d.referenceArtist) {
+      out.push(`**Reference artist (typed):** ${d.referenceArtist}`)
+    }
+    if (d.inspirationThoughts) {
+      out.push(`**What they love about the examples:** ${d.inspirationThoughts}`)
+    }
     if (d.selectedTracks && d.selectedTracks.length > 0) {
       out.push(`**Reference tracks:**`)
       for (const t of d.selectedTracks) {
         out.push(`- [${t.name}](${t.spotifyUrl}) — ${t.artist}`)
       }
-    }
-    if (d.referenceArtist) {
-      out.push(`**Reference artist (typed):** ${d.referenceArtist}`)
+      out.push('')
     }
     if (d.inspirationLinks && d.inspirationLinks.length > 0) {
       out.push(`**Inspiration links:**`)
       for (const link of d.inspirationLinks) {
         out.push(`- ${link}`)
       }
+      out.push('')
     }
-    if (d.inspirationThoughts) {
-      out.push(`**What they love about the examples:** ${d.inspirationThoughts}`)
-    }
-    out.push('')
   }
 
   if (props.driveLink || props.assetNotes) {
