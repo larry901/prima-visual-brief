@@ -129,8 +129,20 @@ export default async function BriefDetailPage({ params }: { params: { id: string
               const tracks = detail.selectedTracks || []
               return (
                 <div key={type} className="card overflow-hidden">
-                  <div className="px-6 py-4 border-b border-brand-border bg-gray-50">
+                  <div className="px-6 py-4 border-b border-brand-border bg-gray-50 flex items-center justify-between gap-3">
                     <h3 className="font-display text-lg font-medium">{type}</h3>
+                    <CopyForNotion
+                      agentName={brief.agent_name}
+                      propertyAddress={brief.property_address}
+                      shootDate={brief.shoot_date}
+                      submittedAt={brief.submitted_at}
+                      videoTypes={videoTypes}
+                      videoDetails={videoDetails}
+                      driveLink={brief.drive_link}
+                      assetNotes={brief.asset_notes}
+                      videoType={type}
+                      variant="compact"
+                    />
                   </div>
                   <div className="p-6 space-y-6">
                     <dl className="space-y-4 text-sm">
