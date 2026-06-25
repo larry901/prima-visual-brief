@@ -86,7 +86,7 @@ export async function sendBriefEmail(data: BriefEmailData) {
 
   return resend.emails.send({
     from: 'Prima Visual <clients@primavisual.io>',
-    to: 'clients@primavisual.io',
+    to: ['clients@primavisual.io', 'editing@primavisual.io'],
     subject: `New Brief: ${data.clientName} — ${data.propertyAddress}`,
     html,
   })
