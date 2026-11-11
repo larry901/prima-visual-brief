@@ -1,3 +1,4 @@
+import { portalBriefCards } from '@/lib/brief-service'
 import { ensureDemoSeed } from '@/lib/portal/seed'
 import { readPortalClient } from '@/lib/portal/session'
 import { getPortalStore } from '@/lib/portal/store'
@@ -34,7 +35,8 @@ export default async function PortalPage({
       )
     }
     const view = await loadPortalView(store, client)
-    return <PortalHome view={view} />
+    const briefs = await portalBriefCards(store, client)
+    return <PortalHome view={view} briefs={briefs} />
   } catch (error) {
     console.error('Portal failed to load:', error)
     return (

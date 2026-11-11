@@ -1,4 +1,6 @@
+import type { BriefRow, BriefUpdate, NewBriefRecord } from '../db'
 import { DEFAULT_COUNTED_TYPES } from './cycle'
+import { clientOwnsBrief } from '../brief-logic'
 import { normalizeEmail } from './ingest'
 import type {
   AppointmentPatch,
@@ -31,7 +33,8 @@ export interface MemoryData {
   sessions: SessionRow[]
   countedTypes: string[]
   briefShootDates: { name: string; email: string; shootDate: string }[]
-  seq: { client: number; appointment: number; magic: number }
+  briefs: BriefRow[]
+  seq: { client: number; appointment: number; magic: number; brief: number }
 }
 
 export function emptyMemoryData(): MemoryData {
@@ -42,7 +45,8 @@ export function emptyMemoryData(): MemoryData {
     sessions: [],
     countedTypes: [...DEFAULT_COUNTED_TYPES],
     briefShootDates: [],
-    seq: { client: 1, appointment: 1, magic: 1 },
+    briefs: [],
+    seq: { client: 1, appointment: 1, magic: 1, brief: 1 },
   }
 }
 
@@ -77,6 +81,8 @@ export class MemoryStore implements PortalStore {
       if (!client.kind) client.kind = 'subscription'
       if (client.schedulingLink === undefined) client.schedulingLink = null
     }
+    if (!this.data.briefs) this.data.briefs = []
+    if (!this.data.seq.brief) this.data.seq.brief = 1
   }
 
   async ensureReady(): Promise<void> {}
@@ -271,8 +277,76 @@ export class MemoryStore implements PortalStore {
   async findBriefShootDates(name: string, email: string): Promise<string[]> {
     const nameKey = name.trim().toLowerCase()
     const emailKey = normalizeEmail(email)
-    return this.data.briefShootDates
+    const legacy = this.data.briefShootDates
       .filter((brief) => brief.name.trim().toLowerCase() === nameKey || brief.email.trim().toLowerCase() === emailKey)
       .map((brief) => brief.shootDate.slice(0, 10))
+    const owned = this.data.briefs
+      .filter((brief) => clientOwnsBrief(brief, { id: -1, email: emailKey }) || (brief.client_email || '').toLowerCase() === emailKey)
+      .map((brief) => brief.shoot_date.slice(0, 10))
+    return Array.from(new Set([...legacy, ...owned]))
+  }
+
+  async listAllBriefs(): Promise<BriefRow[]> {
+    return [...this.data.briefs].sort((a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime())
+  }
+
+  async getBriefById(id: number): Promise<BriefRow | null> {
+    return this.data.briefs.find((brief) => brief.id === id) ?? null
+  }
+
+  async listBriefsForClient(clientId: number, email: string): Promise<BriefRow[]> {
+    return (await this.listAllBriefs()).filter((brief) => clientOwnsBrief(brief, { id: clientId, email }))
+  }
+
+  async getBriefByEditTokenHash(tokenHash: string): Promise<BriefRow | null> {
+    return this.data.briefs.find((brief) => brief.edit_token_hash === tokenHash) ?? null
+  }
+
+  async createBriefRecord(row: NewBriefRecord): Promise<BriefRow> {
+    const brief: BriefRow = {
+      id: this.data.seq.brief++,
+      client_name: row.client_name,
+      client_email: row.client_email,
+      client_id: row.client_id,
+      agent_name: row.agent_name,
+      property_address: row.property_address,
+      shoot_date: row.shoot_date,
+      agent_on_site: row.agent_on_site,
+      gate_code: row.gate_code,
+      lockbox_code: row.lockbox_code,
+      access_notes: row.access_notes,
+      video_types: row.video_types,
+      video_details: row.video_details,
+      drive_link: row.drive_link,
+      asset_notes: row.asset_notes,
+      file_paths: row.file_paths,
+      submitted_at: new Date().toISOString(),
+      updated_at: null,
+      edited_by_client: false,
+      previous_snapshot: null,
+      edit_token_hash: row.edit_token_hash,
+    }
+    this.data.briefs.push(brief)
+    return brief
+  }
+
+  async updateBriefRecord(id: number, patch: BriefUpdate): Promise<BriefRow> {
+    const brief = await this.getBriefById(id)
+    if (!brief) throw new Error('Brief not found')
+    brief.agent_name = patch.agent_name
+    brief.property_address = patch.property_address
+    brief.shoot_date = patch.shoot_date
+    brief.agent_on_site = patch.agent_on_site
+    brief.gate_code = patch.gate_code
+    brief.lockbox_code = patch.lockbox_code
+    brief.access_notes = patch.access_notes
+    brief.video_types = patch.video_types
+    brief.video_details = patch.video_details
+    brief.drive_link = patch.drive_link
+    brief.asset_notes = patch.asset_notes
+    brief.previous_snapshot = patch.previous_snapshot
+    brief.edited_by_client = true
+    brief.updated_at = patch.updated_at
+    return brief
   }
 }

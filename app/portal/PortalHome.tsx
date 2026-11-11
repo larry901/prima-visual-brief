@@ -1,8 +1,32 @@
 import Countdown from './Countdown'
 import SignOutButton from './SignOutButton'
+import type { PortalBriefCard } from '@/lib/brief-service'
 import type { PortalView } from '@/lib/portal/view'
+import type { FrameLink } from '@/lib/portal/types'
 
-export default function PortalHome({ view }: { view: PortalView }) {
+function FilmLink({ video, solo }: { video: FrameLink; solo: boolean }) {
+  return (
+    <a
+      className={solo ? 'portal-film portal-film-solo' : 'portal-film'}
+      href={video.url}
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      <span className="portal-film-play" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M8 5.5v13l11-6.5-11-6.5z" />
+        </svg>
+      </span>
+      <span className="portal-film-copy">
+        {solo && <span className="portal-film-kicker">Ready to watch</span>}
+        <span className="portal-film-label">{video.label}</span>
+      </span>
+      <span className="portal-film-watch">Watch</span>
+    </a>
+  )
+}
+
+export default function PortalHome({ view, briefs }: { view: PortalView; briefs: PortalBriefCard[] }) {
   const firstName = view.name.split(/\s+/)[0] || view.name
   const needsBrief = view.upcoming.some((appointment) => appointment.needsBrief)
 
@@ -72,6 +96,58 @@ export default function PortalHome({ view }: { view: PortalView }) {
             )}
           </section>
 
+          <section className="portal-block portal-films" aria-labelledby="videos-heading">
+            <p className="portal-kicker">The films</p>
+            <h2 id="videos-heading">Your videos</h2>
+            {view.videos.length === 0 ? (
+              <div className="portal-empty">
+                <p>Films land here once they&apos;re delivered.</p>
+              </div>
+            ) : view.videos.length === 1 ? (
+              <FilmLink video={view.videos[0]} solo />
+            ) : (
+              <>
+                <p className="portal-films-intro">Ready to watch. Each film opens in Frame.io.</p>
+                <ul className="portal-film-list">
+                  {view.videos.map((video) => (
+                    <li key={video.url}>
+                      <FilmLink video={video} solo={false} />
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </section>
+
+          <section className="portal-block" aria-labelledby="briefs-heading">
+            <p className="portal-kicker">On file</p>
+            <h2 id="briefs-heading">Your briefs</h2>
+            {briefs.length === 0 ? (
+              <div className="portal-empty">
+                <p>No briefs yet.</p>
+                <a className="portal-text-link" href={view.briefHref}>Fill out your brief</a>
+              </div>
+            ) : (
+              <ul className="portal-brief-list">
+                {briefs.map((brief) => (
+                  <li key={brief.id} className="portal-brief-card">
+                    <p className="portal-film-label">{brief.property}</p>
+                    <p>Shoot {brief.shootLabel}</p>
+                    <p className="portal-muted">Submitted {brief.submittedLabel}</p>
+                    <div className="portal-brief-actions">
+                      <a href={`/portal/briefs/${brief.id}`}>View</a>
+                      {brief.editable ? (
+                        <a className="portal-brief-edit" href={`/portal/briefs/${brief.id}/edit`}>Edit brief</a>
+                      ) : (
+                        <span>Locked</span>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
           {view.upcoming.length > 0 && (
             <section className="portal-block" aria-labelledby="upcoming-heading">
               <h2 id="upcoming-heading">Upcoming</h2>
@@ -94,25 +170,6 @@ export default function PortalHome({ view }: { view: PortalView }) {
             </section>
           )}
 
-          <section className="portal-block" aria-labelledby="videos-heading">
-            <h2 id="videos-heading">Your videos</h2>
-            {view.videos.length === 0 ? (
-              <div className="portal-empty">
-                <p>Films land here once they&apos;re delivered.</p>
-              </div>
-            ) : (
-              <ul className="portal-videos">
-                {view.videos.map((video) => (
-                  <li key={video.url}>
-                    <a href={video.url} target="_blank" rel="noopener noreferrer">
-                      <span>{video.label}</span>
-                      <span aria-hidden="true">↗</span>
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
         </section>
 
         <section className="portal-column" aria-labelledby="book-heading">

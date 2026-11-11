@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { getAllBriefs } from '@/lib/db'
+import { ensureDemoSeed } from '@/lib/portal/seed'
+import { getPortalStore } from '@/lib/portal/store'
 import Link from 'next/link'
 import LogoutButton from '@/app/dashboard/LogoutButton'
 import DashboardNav from '@/app/dashboard/DashboardNav'
@@ -21,7 +22,10 @@ function formatDate(dateStr: string) {
 export default async function BriefsListPage() {
   if (!isAuthenticated()) redirect('/dashboard')
 
-  const briefs = await getAllBriefs()
+  const store = getPortalStore()
+  await store.ensureReady()
+  await ensureDemoSeed(store)
+  const briefs = await store.listAllBriefs()
 
   return (
     <div className="min-h-screen bg-brand-bg">
@@ -63,6 +67,9 @@ export default async function BriefsListPage() {
                       <div>
                         <p className="font-medium group-hover:text-brand-dark">
                           {brief.agent_name}
+                          {brief.edited_by_client && (
+                            <span className="ml-2 text-xs font-normal text-amber-800">Edited by client</span>
+                          )}
                         </p>
                         <p className="text-sm text-brand-muted truncate">{brief.property_address}</p>
                       </div>

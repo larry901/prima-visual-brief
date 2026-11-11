@@ -72,5 +72,11 @@ export function createFileStore(filePath: string): PortalStore {
     getClientBySession: (tokenHash, nowIso) => run((store) => store.getClientBySession(tokenHash, nowIso)),
     deleteSession: (tokenHash) => run((store) => store.deleteSession(tokenHash)),
     findBriefShootDates: (name, email) => run((store) => store.findBriefShootDates(name, email)),
+    listAllBriefs: () => run((store) => store.listAllBriefs()),
+    getBriefById: (id) => run((store) => store.getBriefById(id)),
+    listBriefsForClient: (clientId, email) => run((store) => store.listBriefsForClient(clientId, email)),
+    getBriefByEditTokenHash: (tokenHash) => run((store) => store.getBriefByEditTokenHash(tokenHash)),
+    createBriefRecord: (row) => run((store) => store.createBriefRecord(row)),
+    updateBriefRecord: (id, patch) => run((store) => store.updateBriefRecord(id, patch)),
   }
 }

@@ -1,4 +1,12 @@
 import { neon } from '@neondatabase/serverless'
+import {
+  createBriefRecord as insertBriefRecord,
+  getAllBriefs,
+  getBriefByEditTokenHash as findBriefByToken,
+  getBriefById as findBrief,
+  listBriefsForOwner,
+  updateBriefRecord as saveBriefRecord,
+} from '../db'
 import { DEFAULT_COUNTED_TYPES } from './cycle'
 import { normalizeEmail } from './ingest'
 import type {
@@ -563,6 +571,32 @@ export function createNeonStore(): PortalStore {
       await ensureReady()
       const sql = sqlClient()
       await sql`DELETE FROM portal_sessions WHERE token_hash = ${tokenHash}`
+    },
+
+    async listAllBriefs() {
+      return getAllBriefs()
+    },
+
+    async getBriefById(id) {
+      return findBrief(id)
+    },
+
+    async listBriefsForClient(clientId, email) {
+      return listBriefsForOwner(clientId, email)
+    },
+
+    async getBriefByEditTokenHash(tokenHash) {
+      return findBriefByToken(tokenHash)
+    },
+
+    async createBriefRecord(row) {
+      return insertBriefRecord(row)
+    },
+
+    async updateBriefRecord(id, patch) {
+      const updated = await saveBriefRecord(id, patch)
+      if (!updated) throw new Error('Brief not found')
+      return updated
     },
 
     async findBriefShootDates(name, email) {

@@ -81,6 +81,31 @@ export async function seedDemoRoster(store: PortalStore, now: Date = new Date())
       clientName: maya.name,
     },
   ])
+  await upsertDemoBrief(store, {
+    clientId: maya.id,
+    email: maya.email,
+    name: maya.name,
+    property: '1426 Cortlandt St, Houston, TX 77008',
+    shootDate: addDays(today, 3),
+    highlights: 'Morning light on the oak floors and a slow push into the kitchen.',
+  })
+  await upsertDemoBrief(store, {
+    clientId: maya.id,
+    email: maya.email,
+    name: maya.name,
+    property: '88 Yale St, Houston, TX 77007',
+    shootDate: addDays(today, -12),
+    highlights: 'Twilight exterior and the upstairs landing.',
+  })
+  await upsertDemoBrief(store, {
+    clientId: andre.id,
+    email: andre.email,
+    name: andre.name,
+    property: '410 Heights Blvd, Houston, TX 77007',
+    shootDate: addDays(today, 4),
+    highlights: 'Just-sold energy, front walk to the porch.',
+  })
+
   await replaceSeedAppointments(store, andre.id, [
     {
       acuityAppointmentId: 'demo-andre-upcoming',
@@ -112,6 +137,50 @@ export async function seedDemoRoster(store: PortalStore, now: Date = new Date())
 export async function ensureDemoSeed(store: PortalStore): Promise<void> {
   if (!demoSeedEnabled()) return
   await seedDemoRoster(store)
+}
+
+async function upsertDemoBrief(
+  store: PortalStore,
+  input: {
+    clientId: number
+    email: string
+    name: string
+    property: string
+    shootDate: string
+    highlights: string
+  },
+) {
+  const existing = await store.listBriefsForClient(input.clientId, input.email)
+  if (existing.some((brief) => brief.property_address === input.property)) return
+  const details = {
+    'Listing Tour': {
+      highlights: input.highlights,
+      avoid: '',
+      selectedTracks: [],
+      referenceArtist: '',
+      inspirationLinks: [],
+      inspirationThoughts: '',
+      script: input.highlights,
+    },
+  }
+  await store.createBriefRecord({
+    client_name: input.email,
+    client_email: input.email,
+    client_id: input.clientId,
+    agent_name: input.name,
+    property_address: input.property,
+    shoot_date: input.shootDate,
+    agent_on_site: "Yes, I'll be there",
+    gate_code: null,
+    lockbox_code: null,
+    access_notes: null,
+    video_types: JSON.stringify(['Listing Tour']),
+    video_details: JSON.stringify(details),
+    drive_link: null,
+    asset_notes: null,
+    file_paths: '[]',
+    edit_token_hash: null,
+  })
 }
 
 async function upsertClient(

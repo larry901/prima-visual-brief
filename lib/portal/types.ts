@@ -1,3 +1,5 @@
+import type { BriefRow, BriefUpdate, NewBriefRecord } from '../db'
+
 export type PlanSize = 2 | 4
 export type ClientKind = 'subscription' | 'project'
 export type AppointmentStatus = 'scheduled' | 'rescheduled' | 'cancelled'
@@ -108,4 +110,10 @@ export interface PortalStore extends IngestStore {
   getClientBySession(tokenHash: string, nowIso: string): Promise<ClientRecord | null>
   deleteSession(tokenHash: string): Promise<void>
   findBriefShootDates(name: string, email: string): Promise<string[]>
+  listAllBriefs(): Promise<BriefRow[]>
+  getBriefById(id: number): Promise<BriefRow | null>
+  listBriefsForClient(clientId: number, email: string): Promise<BriefRow[]>
+  getBriefByEditTokenHash(tokenHash: string): Promise<BriefRow | null>
+  createBriefRecord(row: NewBriefRecord): Promise<BriefRow>
+  updateBriefRecord(id: number, patch: BriefUpdate): Promise<BriefRow>
 }

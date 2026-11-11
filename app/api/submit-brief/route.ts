@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { insertBrief } from '@/lib/db'
 import { sendBriefEmail } from '@/lib/email'
+import { readPortalClient } from '@/lib/portal/session'
+import { getPortalStore } from '@/lib/portal/store'
+import { hashToken, newToken } from '@/lib/portal/tokens'
+
+export const dynamic = 'force-dynamic'
+
+function emailOrNull(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const email = value.trim().toLowerCase()
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : null
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -24,26 +34,38 @@ export async function POST(req: NextRequest) {
     if (!agentName || !propertyAddress || !shootDate || !agentOnSite) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
+    if (!Array.isArray(videoTypes) || videoTypes.length === 0) {
+      return NextResponse.json({ error: 'Select at least one video type' }, { status: 400 })
+    }
 
-    const id = await insertBrief({
-      client_name: typeof clientEmail === 'string' ? clientEmail : '',
+    const store = getPortalStore()
+    await store.ensureReady()
+    const sessionClient = await readPortalClient(store).catch(() => null)
+    const submittedEmail = emailOrNull(clientEmail)
+    const clientEmailStored = sessionClient?.email ?? submittedEmail
+    const editToken = newToken()
+
+    const brief = await store.createBriefRecord({
+      client_name: clientEmailStored ?? '',
+      client_email: clientEmailStored,
+      client_id: sessionClient?.id ?? null,
       agent_name: agentName,
       property_address: propertyAddress,
       shoot_date: shootDate,
       agent_on_site: agentOnSite,
-      gate_code: gateCode || undefined,
-      lockbox_code: lockboxCode || undefined,
-      access_notes: accessNotes || undefined,
-      video_types: videoTypes || [],
-      video_details: videoDetails || {},
-      drive_link: driveLink || undefined,
-      asset_notes: assetNotes || undefined,
-      file_paths: [],
+      gate_code: gateCode || null,
+      lockbox_code: lockboxCode || null,
+      access_notes: accessNotes || null,
+      video_types: JSON.stringify(videoTypes),
+      video_details: JSON.stringify(videoDetails || {}),
+      drive_link: driveLink || null,
+      asset_notes: assetNotes || null,
+      file_paths: '[]',
+      edit_token_hash: hashToken(editToken),
     })
 
-    // Send email (don't block on failure)
     sendBriefEmail({
-      clientName: typeof clientEmail === 'string' ? clientEmail : '',
+      clientName: clientEmailStored ?? '',
       agentName,
       propertyAddress,
       shootDate,
@@ -51,14 +73,18 @@ export async function POST(req: NextRequest) {
       gateCode,
       lockboxCode,
       accessNotes,
-      videoTypes: videoTypes || [],
+      videoTypes,
       videoDetails: videoDetails || {},
       driveLink,
       assetNotes,
       fileNames: [],
     }).catch((err) => console.error('Email send failed:', err))
 
-    return NextResponse.json({ success: true, id })
+    return NextResponse.json({
+      success: true,
+      id: brief.id,
+      editPath: `/brief/edit?token=${encodeURIComponent(editToken)}`,
+    })
   } catch (err: unknown) {
     console.error('Submit error:', err)
     return NextResponse.json({ error: 'Submission failed' }, { status: 500 })

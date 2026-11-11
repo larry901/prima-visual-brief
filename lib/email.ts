@@ -21,6 +21,8 @@ interface BriefEmailData {
   driveLink?: string
   assetNotes?: string
   fileNames: string[]
+  updated?: boolean
+  changedFields?: string[]
 }
 
 export async function sendBriefEmail(data: BriefEmailData) {
@@ -50,8 +52,9 @@ export async function sendBriefEmail(data: BriefEmailData) {
     <html>
     <head><meta charset="utf-8"></head>
     <body style="font-family: Inter, Arial, sans-serif; max-width: 680px; margin: 0 auto; color: #1A1A1A; padding: 32px 16px;">
-      <h1 style="font-size: 28px; font-weight: 700; margin-bottom: 4px;">New Creative Brief</h1>
-      <p style="color: #6B7280; margin-top: 0; margin-bottom: 32px;">Submitted via Prima Visual Brief Form</p>
+      <h1 style="font-size: 28px; font-weight: 700; margin-bottom: 4px;">${data.updated ? 'Brief updated' : 'New Creative Brief'}</h1>
+      <p style="color: #6B7280; margin-top: 0; margin-bottom: 32px;">${data.updated ? 'Edited by client' : 'Submitted via Prima Visual Brief Form'}</p>
+      ${data.updated && data.changedFields?.length ? `<p><strong>Changed:</strong> ${data.changedFields.join(', ')}</p>` : ''}
 
       <h2 style="font-size: 18px; border-bottom: 1px solid #E5E7EB; padding-bottom: 8px;">Shoot Info</h2>
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
@@ -91,7 +94,7 @@ export async function sendBriefEmail(data: BriefEmailData) {
   return resendClient().emails.send({
     from: 'Prima Visual <clients@primavisual.io>',
     to: ['clients@primavisual.io', 'editing@primavisual.io'],
-    subject: `New Brief: ${data.clientName} — ${data.propertyAddress}`,
+    subject: `${data.updated ? 'Brief updated' : 'New Brief'}: ${data.clientName || data.agentName} — ${data.propertyAddress}`,
     html,
   })
 }

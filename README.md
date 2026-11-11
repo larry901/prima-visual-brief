@@ -126,7 +126,9 @@ Clients sign in at `/portal`. There are two kinds:
 - **Subscription.** Plan of 2 or 4 shoots a month, a renewal date, shoots left this cycle, and a private Acuity scheduling link (the full URL, including any certificate or package code). The portal embeds that link and adds `firstName`, `lastName`, and `email` without dropping the code. If the link is blank, the portal says **Contact us to schedule** and does not open the paid public scheduler. The roster flags that client.
 - **Per project.** No plan and no renewal, so those blocks are hidden. Booking uses the public scheduler at `https://primavisual.as.me` with the client's name and email filled in.
 
-Both kinds see their videos, the countdown to the next shoot (or an empty state), and **Fill out your brief**.
+Both kinds see their videos first — large Watch cards, or one gold button when there is a single film — then the briefs they submitted, the countdown, and **Fill out your brief**.
+
+A client only sees their own briefs, matched by roster id or email. They can edit a brief until the shoot starts (the appointment time that day, or midnight Chicago when the brief only has a date). After that it is read-only. Edits save over the same submission, keep the previous version, mark **Edited by client** on the dashboard, and email the team through Resend. The confirmation screen also includes a private edit link.
 
 Acuity is on the Standard plan, so the app does not call the Acuity API. The brief link opens the existing form with name, email, and shoot date filled in when those are known. Scheduling links are shown only to that signed-in client and to staff in the dashboard. They are not written to logs.
 
