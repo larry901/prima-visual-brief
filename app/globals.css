@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=Montserrat:wght@700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -29,4 +29,197 @@
   .section-label {
     @apply text-xs font-semibold uppercase tracking-widest text-brand-muted mb-4;
   }
+}
+
+/* Client portal. Scoped so the brief form and dashboard keep their own type. */
+.portal {
+  min-height: 100vh;
+  background: #000000;
+  color: #ffffff;
+  font-family: Inter, system-ui, sans-serif;
+  font-weight: 400;
+}
+.portal h1,
+.portal h2,
+.portal h3 {
+  font-family: Montserrat, Inter, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: #ffffff;
+}
+.portal h1 { font-size: clamp(2.4rem, 6vw, 4rem); line-height: 0.95; }
+.portal h2 { font-size: 1.35rem; margin-bottom: 0.75rem; }
+.portal-shell { min-height: 100vh; }
+.portal-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 20px 0;
+  max-width: 1120px;
+  margin: 0 auto;
+}
+.portal-wordmark {
+  font-family: Montserrat, Inter, sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  font-size: 12px;
+}
+.portal-kicker {
+  color: #B0892F;
+  font-family: Montserrat, Inter, sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.portal-layout {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 28px 20px 72px;
+  display: grid;
+  gap: 8px;
+}
+.portal-login {
+  max-width: 420px;
+  margin: 12vh auto 0;
+  padding: 0 20px 64px;
+}
+.portal-lede, .portal-company, .portal-muted, .portal-note {
+  color: #d4d4d4;
+  line-height: 1.5;
+}
+.portal-company { margin-top: 8px; color: #B0892F; }
+.portal-muted { color: #a3a3a3; font-size: 0.875rem; margin-top: 10px; }
+.portal-stack { display: grid; gap: 12px; margin-top: 28px; }
+.portal-label { font-size: 0.875rem; }
+.portal-input {
+  width: 100%;
+  background: #111111;
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  padding: 14px 16px;
+  font-size: 16px;
+  border-radius: 0;
+}
+.portal-input:focus {
+  outline: 2px solid #B0892F;
+  border-color: #B0892F;
+}
+.portal-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  box-sizing: border-box;
+  background: #B0892F;
+  color: #000000;
+  font-family: Montserrat, Inter, sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 12px;
+  padding: 16px 18px;
+  min-height: 48px;
+  text-decoration: none;
+  border: 0;
+  cursor: pointer;
+}
+.portal-btn:disabled { opacity: 0.55; cursor: wait; }
+.portal-btn-link { margin-top: 16px; }
+.portal-text-btn, .portal-text-link {
+  background: none;
+  border: 0;
+  color: #ffffff;
+  font-size: 0.875rem;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-color: #B0892F;
+  cursor: pointer;
+  padding: 12px 0;
+}
+.portal-text-link { display: block; text-align: center; }
+.portal-actions { display: grid; gap: 4px; margin-top: 14px; }
+.portal-error { color: #f2c1c1; font-size: 0.875rem; }
+.portal-banner {
+  display: grid;
+  gap: 4px;
+  margin-top: 24px;
+  padding: 16px;
+  border: 1px solid #B0892F;
+  color: #ffffff;
+  text-decoration: none;
+}
+.portal-banner strong { font-family: Montserrat, Inter, sans-serif; font-size: 1.05rem; }
+.portal-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 28px;
+}
+.portal-stats article {
+  border-top: 1px solid #B0892F;
+  padding-top: 12px;
+}
+.portal-stat {
+  font-family: Montserrat, Inter, sans-serif;
+  font-weight: 700;
+  font-size: clamp(3rem, 8vw, 4.5rem);
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+}
+.portal-stat-label { color: #d4d4d4; margin-top: 6px; font-size: 0.875rem; }
+.portal-renewal { margin-top: 18px; color: #d4d4d4; font-size: 0.95rem; }
+.portal-renewal strong { color: #ffffff; }
+.portal-renewal span { display: block; color: #a3a3a3; font-size: 0.8rem; margin-top: 4px; }
+.portal-block { margin-top: 36px; }
+.portal-shoot-type {
+  color: #B0892F;
+  font-family: Montserrat, Inter, sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 12px;
+}
+.portal-shoot-when { font-size: 1.15rem; margin: 6px 0 14px; }
+.portal-countdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 18px;
+  font-family: Montserrat, Inter, sans-serif;
+  font-weight: 700;
+  font-size: clamp(1.5rem, 7vw, 2rem);
+  font-variant-numeric: tabular-nums;
+}
+.portal-countdown span { white-space: nowrap; }
+.portal-countdown small {
+  color: #B0892F;
+  font-size: 0.7rem;
+  margin-left: 3px;
+}
+.portal-countdown-placeholder { color: #a3a3a3; font-size: 0.9rem; }
+.portal-empty { color: #d4d4d4; display: grid; gap: 4px; }
+.portal-list, .portal-videos { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.portal-list li, .portal-videos a {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  border-top: 1px solid rgba(176, 137, 47, 0.4);
+  padding-top: 12px;
+  color: #ffffff;
+  text-decoration: none;
+}
+.portal-videos a { min-height: 48px; }
+.portal-videos a span:last-child { color: #B0892F; }
+.portal-list a { color: #B0892F; font-weight: 600; }
+.portal-frame {
+  width: 100%;
+  min-height: 70vh;
+  height: 820px;
+  border: 1px solid rgba(176, 137, 47, 0.45);
+  background: #ffffff;
+  margin-top: 8px;
 }

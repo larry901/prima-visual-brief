@@ -1,7 +1,11 @@
 import { Resend } from 'resend'
 import { VideoDetail } from './db'
 
-const resend = new Resend(process.env.EMAIL_API_KEY)
+function resendClient() {
+  const key = process.env.EMAIL_API_KEY
+  if (!key) throw new Error('EMAIL_API_KEY is not set')
+  return new Resend(key)
+}
 
 interface BriefEmailData {
   clientName: string
@@ -84,7 +88,7 @@ export async function sendBriefEmail(data: BriefEmailData) {
     </html>
   `
 
-  return resend.emails.send({
+  return resendClient().emails.send({
     from: 'Prima Visual <clients@primavisual.io>',
     to: ['clients@primavisual.io', 'editing@primavisual.io'],
     subject: `New Brief: ${data.clientName} — ${data.propertyAddress}`,

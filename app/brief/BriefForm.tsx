@@ -20,15 +20,23 @@ const defaultVideoDetail = (): VideoDetailState => ({
   script: '',
 })
 
-export default function BriefForm() {
+export default function BriefForm({
+  initialAgentName = '',
+  initialEmail = '',
+  initialShootDate = '',
+}: {
+  initialAgentName?: string
+  initialEmail?: string
+  initialShootDate?: string
+} = {}) {
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Section 1
-  const [agentName, setAgentName] = useState('')
+  const [agentName, setAgentName] = useState(initialAgentName)
   const [propertyAddress, setPropertyAddress] = useState('')
-  const [shootDate, setShootDate] = useState('')
+  const [shootDate, setShootDate] = useState(initialShootDate)
 
   // Section 2
   const [agentOnSite, setAgentOnSite] = useState('')
@@ -88,6 +96,7 @@ export default function BriefForm() {
           videoDetails,
           driveLink,
           assetNotes,
+          clientEmail: initialEmail,
         }),
       })
 
@@ -140,6 +149,12 @@ export default function BriefForm() {
           <p className="text-brand-muted">
             Help us bring your vision to life. Complete this form at least 24 hours before your shoot.
           </p>
+          {initialEmail && (
+            <p className="text-sm text-brand-muted mt-3">
+              Prefilled for {initialEmail}
+              {initialShootDate ? ` · shoot ${initialShootDate}` : ''}.
+            </p>
+          )}
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-8">

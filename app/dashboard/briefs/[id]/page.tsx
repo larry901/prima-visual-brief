@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import TrackList from '@/app/dashboard/TrackList'
 import LogoutButton from '@/app/dashboard/LogoutButton'
+import DashboardNav from '@/app/dashboard/DashboardNav'
 import CopyForNotion from '@/app/dashboard/CopyForNotion'
 
 function isAuthenticated() {
@@ -37,9 +38,12 @@ export default async function BriefDetailPage({ params }: { params: { id: string
   return (
     <div className="min-h-screen bg-brand-bg">
       <header className="bg-white border-b border-brand-border">
-        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="max-w-3xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
           <div className="font-display text-xl font-semibold">Prima Visual</div>
-          <LogoutButton />
+          <div className="flex items-center gap-4">
+            <DashboardNav current="briefs" />
+            <LogoutButton />
+          </div>
         </div>
       </header>
 

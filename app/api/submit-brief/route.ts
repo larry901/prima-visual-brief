@@ -18,6 +18,7 @@ export async function POST(req: NextRequest) {
       videoDetails,
       driveLink,
       assetNotes,
+      clientEmail,
     } = body
 
     if (!agentName || !propertyAddress || !shootDate || !agentOnSite) {
@@ -25,7 +26,7 @@ export async function POST(req: NextRequest) {
     }
 
     const id = await insertBrief({
-      client_name: '',
+      client_name: typeof clientEmail === 'string' ? clientEmail : '',
       agent_name: agentName,
       property_address: propertyAddress,
       shoot_date: shootDate,
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
 
     // Send email (don't block on failure)
     sendBriefEmail({
-      clientName: '',
+      clientName: typeof clientEmail === 'string' ? clientEmail : '',
       agentName,
       propertyAddress,
       shootDate,
