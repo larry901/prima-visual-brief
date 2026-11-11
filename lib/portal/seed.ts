@@ -27,10 +27,7 @@ export async function seedDemoRoster(store: PortalStore, now: Date = new Date())
     renewalDate: mayaRenewal,
     schedulingLink: 'https://example.com/schedule/maya?certificate=EXAMPLE-CODE',
     active: true,
-    frameioLinks: [
-      { label: 'Listing film — 1426 Cortlandt', url: 'https://app.frame.io/reviews/demo-listing-maya' },
-      { label: 'Brand reel', url: 'https://app.frame.io/reviews/demo-brand-maya' },
-    ],
+    frameioUrl: 'https://app.frame.io/reviews/demo-listing-maya',
   })
   const andre = await upsertClient(store, {
     name: 'Andre Walsh',
@@ -41,7 +38,7 @@ export async function seedDemoRoster(store: PortalStore, now: Date = new Date())
     renewalDate: null,
     schedulingLink: null,
     active: true,
-    frameioLinks: [{ label: 'Just sold — Heights', url: 'https://app.frame.io/reviews/demo-just-sold-andre' }],
+    frameioUrl: 'https://app.frame.io/reviews/demo-just-sold-andre',
   })
   await upsertClient(store, {
     name: 'Priya Nair',
@@ -52,7 +49,7 @@ export async function seedDemoRoster(store: PortalStore, now: Date = new Date())
     renewalDate: priyaRenewal,
     schedulingLink: null,
     active: false,
-    frameioLinks: [],
+    frameioUrl: null,
   })
 
   await replaceSeedAppointments(store, maya.id, [
@@ -194,7 +191,7 @@ async function upsertClient(
     renewalDate: string | null
     schedulingLink: string | null
     active: boolean
-    frameioLinks: { label: string; url: string }[]
+    frameioUrl: string | null
   },
 ) {
   const existing = await store.findClientByEmail(input.email)

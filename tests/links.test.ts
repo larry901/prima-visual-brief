@@ -102,7 +102,7 @@ describe('portal booking by client type', () => {
       renewalDate: null,
       schedulingLink: 'https://example.com/private?certificate=EXAMPLE-CODE',
       active: true,
-      frameioLinks: [],
+      frameioUrl: null,
     })
     const view = await loadPortalView(store, client, new Date('2026-11-11T18:00:00.000Z'))
     assert.equal(view.showPlan, false)
@@ -123,7 +123,7 @@ describe('portal booking by client type', () => {
       renewalDate: '2026-12-21',
       schedulingLink: null,
       active: true,
-      frameioLinks: [],
+      frameioUrl: null,
     })
     const view = await loadPortalView(store, client, new Date('2026-11-11T18:00:00.000Z'))
     assert.equal(view.showPlan, true)

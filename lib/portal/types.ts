@@ -5,11 +5,6 @@ export type ClientKind = 'subscription' | 'project'
 export type AppointmentStatus = 'scheduled' | 'rescheduled' | 'cancelled'
 export type IngestEventName = 'new' | 'rescheduled' | 'cancelled'
 
-export interface FrameLink {
-  label: string
-  url: string
-}
-
 export interface ClientRecord {
   id: number
   name: string
@@ -20,7 +15,7 @@ export interface ClientRecord {
   renewalDate: string | null
   billingAnchorDay: number | null
   schedulingLink: string | null
-  frameioLinks: FrameLink[]
+  frameioUrl: string | null
   active: boolean
 }
 
@@ -32,7 +27,7 @@ export interface ClientInput {
   planSize: PlanSize | null
   renewalDate: string | null
   schedulingLink: string | null
-  frameioLinks: FrameLink[]
+  frameioUrl: string | null
   active: boolean
 }
 

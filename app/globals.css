@@ -288,6 +288,12 @@
   background: #000000;
   color: #ffffff;
 }
+.portal-film-soon {
+  background: #111111;
+  color: #ffffff;
+  border-style: dashed;
+  min-height: 92px;
+}
 @media (max-width: 420px) {
   .portal-film { align-items: flex-start; }
   .portal-film-watch { align-self: center; padding: 12px 12px; }

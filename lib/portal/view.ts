@@ -9,7 +9,7 @@ import {
   resolveCycle,
   shootsRemaining,
 } from './cycle'
-import type { AppointmentRecord, ClientRecord, FrameLink, PortalStore } from './types'
+import type { AppointmentRecord, ClientRecord, PortalStore } from './types'
 
 export interface PortalAppointmentView {
   id: number
@@ -35,7 +35,7 @@ export interface PortalView {
   remaining: number
   nextShoot: PortalAppointmentView | null
   upcoming: PortalAppointmentView[]
-  videos: FrameLink[]
+  frameioUrl: string | null
   /** Merged scheduler URL for this client only. Null when a subscription client has no private link. */
   bookingUrl: string | null
   briefHref: string
@@ -116,7 +116,7 @@ export async function loadPortalView(
     remaining: tally.remaining,
     nextShoot: next ? toView(next) : null,
     upcoming,
-    videos: client.frameioLinks,
+    frameioUrl: client.frameioUrl,
     bookingUrl: bookingUrl({
       kind: client.kind,
       schedulingLink: client.schedulingLink,

@@ -59,7 +59,7 @@ export default async function ClientsPage() {
         renewalDate: view.renewalDate,
         schedulingLink: client.schedulingLink,
         missingSchedulingLink: client.kind === 'subscription' && !client.schedulingLink,
-        frameioLinks: client.frameioLinks,
+        frameioUrl: client.frameioUrl,
         active: client.active,
         remaining: view.remaining,
         used: view.used,

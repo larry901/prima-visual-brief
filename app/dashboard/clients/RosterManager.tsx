@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import type { ClientKind, FrameLink, PlanSize } from '@/lib/portal/types'
+import type { ClientKind, PlanSize } from '@/lib/portal/types'
 
 export interface RosterClient {
   id: number
@@ -14,7 +14,7 @@ export interface RosterClient {
   renewalDate: string
   schedulingLink: string | null
   missingSchedulingLink: boolean
-  frameioLinks: FrameLink[]
+  frameioUrl: string | null
   active: boolean
   remaining: number
   used: number
@@ -42,7 +42,7 @@ interface Draft {
   renewalDate: string
   schedulingLink: string
   active: boolean
-  frameioLinks: FrameLink[]
+  frameioUrl: string
 }
 
 const emptyDraft = (): Draft => ({
@@ -54,7 +54,7 @@ const emptyDraft = (): Draft => ({
   renewalDate: '',
   schedulingLink: '',
   active: true,
-  frameioLinks: [{ label: '', url: '' }],
+  frameioUrl: '',
 })
 
 function draftFrom(client: RosterClient): Draft {
@@ -67,7 +67,7 @@ function draftFrom(client: RosterClient): Draft {
     renewalDate: client.renewalDate,
     schedulingLink: client.schedulingLink ?? '',
     active: client.active,
-    frameioLinks: client.frameioLinks.length > 0 ? client.frameioLinks : [{ label: '', url: '' }],
+    frameioUrl: client.frameioUrl ?? '',
   }
 }
 
@@ -301,13 +301,6 @@ function ClientForm({
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
-  const updateLink = (index: number, patch: Partial<FrameLink>) => {
-    setForm({
-      ...form,
-      frameioLinks: form.frameioLinks.map((link, i) => (i === index ? { ...link, ...patch } : link)),
-    })
-  }
-
   return (
     <form
       className="card p-5 space-y-4 bg-brand-bg"
@@ -395,43 +388,23 @@ function ClientForm({
         </label>
       </div>
 
-      <fieldset className="space-y-3">
-        <legend className="text-sm font-medium">Frame.io links</legend>
-        {form.frameioLinks.map((link, index) => (
-          <div key={index} className="grid gap-3 sm:grid-cols-[1fr_1.4fr_auto]">
-            <input
-              className="input"
-              placeholder="Label"
-              aria-label={`Video label ${index + 1}`}
-              value={link.label}
-              onChange={(event) => updateLink(index, { label: event.target.value })}
-            />
-            <input
-              className="input"
-              placeholder="https://app.frame.io/..."
-              aria-label={`Video URL ${index + 1}`}
-              value={link.url}
-              onChange={(event) => updateLink(index, { url: event.target.value })}
-            />
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() =>
-                setForm({ ...form, frameioLinks: form.frameioLinks.filter((_, i) => i !== index) })
-              }
-            >
-              Remove
-            </button>
-          </div>
-        ))}
-        <button
-          type="button"
-          className="btn-secondary"
-          onClick={() => setForm({ ...form, frameioLinks: [...form.frameioLinks, { label: '', url: '' }] })}
-        >
-          Add link
-        </button>
-      </fieldset>
+      <label className="block text-sm" htmlFor="frameio-url">
+        <span className="font-medium">Frame.io link</span>
+        <input
+          id="frameio-url"
+          className="input mt-1.5"
+          type="url"
+          inputMode="url"
+          autoComplete="off"
+          spellCheck={false}
+          placeholder="https://app.frame.io/..."
+          value={form.frameioUrl}
+          onChange={(event) => setForm({ ...form, frameioUrl: event.target.value })}
+        />
+        <span className="mt-1 block text-xs text-brand-muted">
+          One shared link for all of this client&apos;s footage. Leave it blank until the films are ready.
+        </span>
+      </label>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button className="btn-primary" type="submit" disabled={saving}>

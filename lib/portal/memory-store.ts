@@ -1,4 +1,5 @@
 import type { BriefRow, BriefUpdate, NewBriefRecord } from '../db'
+import { readFrameioUrl } from './clients'
 import { DEFAULT_COUNTED_TYPES } from './cycle'
 import { clientOwnsBrief } from '../brief-logic'
 import { normalizeEmail } from './ingest'
@@ -78,8 +79,10 @@ export class MemoryStore implements PortalStore {
   constructor(data: MemoryData = emptyMemoryData()) {
     this.data = data
     for (const client of this.data.clients) {
+      const legacy = client as ClientRecord & { frameioLinks?: unknown }
       if (!client.kind) client.kind = 'subscription'
       if (client.schedulingLink === undefined) client.schedulingLink = null
+      if (!client.frameioUrl) client.frameioUrl = readFrameioUrl(legacy.frameioLinks)
     }
     if (!this.data.briefs) this.data.briefs = []
     if (!this.data.seq.brief) this.data.seq.brief = 1
@@ -115,7 +118,7 @@ export class MemoryStore implements PortalStore {
       renewalDate: plan.renewalDate,
       billingAnchorDay: plan.billingAnchorDay,
       schedulingLink: input.schedulingLink,
-      frameioLinks: input.frameioLinks,
+      frameioUrl: input.frameioUrl,
       active: input.active,
     }
     this.data.clients.push(client)
@@ -137,7 +140,7 @@ export class MemoryStore implements PortalStore {
     client.renewalDate = plan.renewalDate
     client.billingAnchorDay = plan.billingAnchorDay
     client.schedulingLink = input.schedulingLink
-    client.frameioLinks = input.frameioLinks
+    client.frameioUrl = input.frameioUrl
     client.active = input.active
     return client
   }

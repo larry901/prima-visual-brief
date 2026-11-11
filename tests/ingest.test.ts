@@ -31,7 +31,7 @@ async function roster() {
     renewalDate: '2026-12-15',
     schedulingLink: null,
     active: true,
-    frameioLinks: [],
+    frameioUrl: null,
   })
   return store
 }

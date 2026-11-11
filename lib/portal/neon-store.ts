@@ -7,6 +7,7 @@ import {
   listBriefsForOwner,
   updateBriefRecord as saveBriefRecord,
 } from '../db'
+import { readFrameioUrl } from './clients'
 import { DEFAULT_COUNTED_TYPES } from './cycle'
 import { normalizeEmail } from './ingest'
 import type {
@@ -16,7 +17,6 @@ import type {
   ClientInput,
   ClientKind,
   ClientRecord,
-  FrameLink,
   NewAppointment,
   PlanSize,
   PortalStore,
@@ -78,22 +78,6 @@ function storedPlan(input: ClientInput, existing: ClientRecord | null) {
   return { planSize: input.planSize, renewalDate, billingAnchorDay }
 }
 
-function parseLinks(value: unknown): FrameLink[] {
-  try {
-    const raw = typeof value === 'string' ? JSON.parse(value) : value
-    if (!Array.isArray(raw)) return []
-    return raw.flatMap((entry) => {
-      if (!entry || typeof entry !== 'object') return []
-      const label = typeof (entry as { label?: unknown }).label === 'string' ? (entry as { label: string }).label : ''
-      const url = typeof (entry as { url?: unknown }).url === 'string' ? (entry as { url: string }).url : ''
-      if (!label || !url) return []
-      return [{ label, url }]
-    })
-  } catch {
-    return []
-  }
-}
-
 interface ClientRow {
   id: number
   name: string
@@ -104,6 +88,7 @@ interface ClientRow {
   renewal_date: string | Date | null
   billing_anchor_day: number | null
   scheduling_link: string | null
+  frameio_url: string | null
   frameio_links: string
   active: boolean
 }
@@ -134,7 +119,7 @@ function mapClient(row: ClientRow): ClientRecord {
     renewalDate: asDate(row.renewal_date),
     billingAnchorDay: asAnchor(row.billing_anchor_day),
     schedulingLink: row.scheduling_link?.trim() || null,
-    frameioLinks: parseLinks(row.frameio_links),
+    frameioUrl: readFrameioUrl(row.frameio_url) || readFrameioUrl(row.frameio_links),
     active: asBool(row.active),
   }
 }
@@ -187,6 +172,7 @@ export function createNeonStore(): PortalStore {
         renewal_date DATE,
         billing_anchor_day INTEGER CHECK (billing_anchor_day IS NULL OR billing_anchor_day BETWEEN 1 AND 31),
         scheduling_link TEXT,
+        frameio_url TEXT,
         frameio_links TEXT NOT NULL DEFAULT '[]',
         active BOOLEAN NOT NULL DEFAULT TRUE,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -244,6 +230,7 @@ export function createNeonStore(): PortalStore {
     `
     await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS client_kind TEXT NOT NULL DEFAULT 'subscription'`
     await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS scheduling_link TEXT`
+    await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS frameio_url TEXT`
     await sql`ALTER TABLE clients ALTER COLUMN plan_size DROP NOT NULL`
     await sql`ALTER TABLE clients ALTER COLUMN renewal_date DROP NOT NULL`
     await sql`ALTER TABLE clients ALTER COLUMN billing_anchor_day DROP NOT NULL`
@@ -285,7 +272,7 @@ export function createNeonStore(): PortalStore {
         const rows = await sql`
           INSERT INTO clients (
             name, email, company, client_kind, plan_size, renewal_date, billing_anchor_day,
-            scheduling_link, frameio_links, active
+            scheduling_link, frameio_url, frameio_links, active
           ) VALUES (
             ${input.name},
             ${normalizeEmail(input.email)},
@@ -295,7 +282,8 @@ export function createNeonStore(): PortalStore {
             ${plan.renewalDate},
             ${plan.billingAnchorDay},
             ${input.schedulingLink},
-            ${JSON.stringify(input.frameioLinks)},
+            ${input.frameioUrl},
+            ${input.frameioUrl ?? '[]'},
             ${input.active}
           )
           RETURNING *
@@ -324,7 +312,8 @@ export function createNeonStore(): PortalStore {
             renewal_date = ${plan.renewalDate},
             billing_anchor_day = ${plan.billingAnchorDay},
             scheduling_link = ${input.schedulingLink},
-            frameio_links = ${JSON.stringify(input.frameioLinks)},
+            frameio_url = ${input.frameioUrl},
+            frameio_links = ${input.frameioUrl ?? '[]'},
             active = ${input.active},
             updated_at = NOW()
           WHERE id = ${id}
