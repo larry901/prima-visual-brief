@@ -121,15 +121,16 @@ The `@aws-sdk/client-s3` package is dynamically imported at runtime only when S3
 
 ## Client portal
 
-Clients on a retainer sign in at `/portal`. The page shows:
+Clients sign in at `/portal`. There are two kinds:
 
-- Plan size (2 or 4 shoots a month) and the next renewal date
-- Shoots left in the current cycle
-- A live countdown to the next shoot, in America/Chicago, or an empty state when nothing is booked
-- Labeled Frame.io links, each opening in a new tab
-- Larry's Acuity scheduler embedded from `https://primavisual.as.me` with `firstName`, `lastName`, and `email` prefilled
+- **Subscription.** Plan of 2 or 4 shoots a month, a renewal date, shoots left this cycle, and a private Acuity scheduling link (the full URL, including any certificate or package code). The portal embeds that link and adds `firstName`, `lastName`, and `email` without dropping the code. If the link is blank, the portal says **Contact us to schedule** and does not open the paid public scheduler. The roster flags that client.
+- **Per project.** No plan and no renewal, so those blocks are hidden. Booking uses the public scheduler at `https://primavisual.as.me` with the client's name and email filled in.
 
-Acuity is on the Standard plan, so the app does not call the Acuity API. After someone books, the portal keeps a **Fill out your brief** button. It also shows that button whenever an upcoming shoot has no matching brief. The link opens the existing form with name, email, and shoot date filled in when they are known.
+Both kinds see their videos, the countdown to the next shoot (or an empty state), and **Fill out your brief**.
+
+Acuity is on the Standard plan, so the app does not call the Acuity API. The brief link opens the existing form with name, email, and shoot date filled in when those are known. Scheduling links are shown only to that signed-in client and to staff in the dashboard. They are not written to logs.
+
+The cycle rules below apply to subscription clients only.
 
 There are no reminder emails or texts. Crystal keeps doing those.
 

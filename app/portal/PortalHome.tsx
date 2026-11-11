@@ -27,25 +27,29 @@ export default function PortalHome({ view }: { view: PortalView }) {
             </a>
           )}
 
-          <div className="portal-stats">
-            <article>
-              <p className="portal-kicker">Plan</p>
-              <p className="portal-stat">{view.planSize}</p>
-              <p className="portal-stat-label">shoots / month</p>
-            </article>
-            <article>
-              <p className="portal-kicker">This cycle</p>
-              <p className="portal-stat">{view.remaining}</p>
-              <p className="portal-stat-label">
-                {view.remaining === 1 ? 'shoot left' : 'shoots left'}
-                {view.used > 0 ? ` · ${view.used} booked` : ''}
+          {view.showPlan && (
+            <>
+              <div className="portal-stats">
+                <article>
+                  <p className="portal-kicker">Plan</p>
+                  <p className="portal-stat">{view.planSize}</p>
+                  <p className="portal-stat-label">shoots / month</p>
+                </article>
+                <article>
+                  <p className="portal-kicker">This cycle</p>
+                  <p className="portal-stat">{view.remaining}</p>
+                  <p className="portal-stat-label">
+                    {view.remaining === 1 ? 'shoot left' : 'shoots left'}
+                    {view.used > 0 ? ` · ${view.used} booked` : ''}
+                  </p>
+                </article>
+              </div>
+              <p className="portal-renewal">
+                Next renewal <strong>{view.renewalLabel}</strong>
+                <span> Cycle opened {view.cycleStartLabel}. Unused shoots don&apos;t roll over.</span>
               </p>
-            </article>
-          </div>
-          <p className="portal-renewal">
-            Next renewal <strong>{view.renewalLabel}</strong>
-            <span> Cycle opened {view.cycleStartLabel}. Unused shoots don&apos;t roll over.</span>
-          </p>
+            </>
+          )}
 
           <section className="portal-block" aria-labelledby="next-shoot-heading">
             <h2 id="next-shoot-heading">Next shoot</h2>
@@ -77,7 +81,7 @@ export default function PortalHome({ view }: { view: PortalView }) {
                     <div>
                       <p className="portal-shoot-type">{appointment.type}</p>
                       <p>{appointment.label}</p>
-                      {!appointment.countsTowardPlan && (
+                      {view.showPlan && !appointment.countsTowardPlan && (
                         <p className="portal-muted">Doesn&apos;t count toward the monthly shoots.</p>
                       )}
                     </div>
@@ -114,25 +118,39 @@ export default function PortalHome({ view }: { view: PortalView }) {
         <section className="portal-column" aria-labelledby="book-heading">
           <div className="portal-block portal-book">
             <h2 id="book-heading">Book a shoot</h2>
-            <p className="portal-lede">
-              Your name and email are already filled in. Pick a time, then send the brief so production has it before the crew arrives.
-            </p>
-            <iframe
-              className="portal-frame"
-              src={view.acuityUrl}
-              title="Book a Prima Visual shoot"
-            />
-            <div className="portal-actions">
-              <a className="portal-text-link" href={view.acuityUrl} target="_blank" rel="noopener noreferrer">
-                Open the scheduler in a new tab
-              </a>
-              <a className="portal-btn" href={view.briefHref}>
-                Fill out your brief
-              </a>
-            </div>
-            <p className="portal-muted">
-              Booking and the brief are separate. After you choose a time, use the button above — it carries your name, email, and the next shoot date when one is already on the calendar.
-            </p>
+            {view.bookingUrl ? (
+              <>
+                <p className="portal-lede">
+                  Your name and email are already filled in. Pick a time, then send the brief so production has it before the crew arrives.
+                </p>
+                <iframe
+                  className="portal-frame"
+                  src={view.bookingUrl}
+                  title="Book a Prima Visual shoot"
+                />
+                <div className="portal-actions">
+                  <a className="portal-text-link" href={view.bookingUrl} target="_blank" rel="noopener noreferrer">
+                    Open the scheduler in a new tab
+                  </a>
+                  <a className="portal-btn" href={view.briefHref}>
+                    Fill out your brief
+                  </a>
+                </div>
+                <p className="portal-muted">
+                  Booking and the brief are separate. After you choose a time, use the button above — it carries your name, email, and the next shoot date when one is already on the calendar.
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="portal-empty">
+                  <p>Contact us to schedule</p>
+                  <p>Your private booking link isn&apos;t on file yet. Email clients@primavisual.io and we&apos;ll set it up.</p>
+                </div>
+                <a className="portal-btn portal-btn-link" href={view.briefHref}>
+                  Fill out your brief
+                </a>
+              </>
+            )}
           </div>
         </section>
       </div>

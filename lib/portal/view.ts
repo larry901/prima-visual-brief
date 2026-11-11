@@ -1,4 +1,4 @@
-import { acuitySchedulerUrl, briefFormHref } from './links'
+import { bookingUrl, briefFormHref } from './links'
 import {
   chicagoDate,
   chicagoToday,
@@ -26,7 +26,8 @@ export interface PortalView {
   name: string
   email: string
   company: string
-  planSize: 2 | 4
+  showPlan: boolean
+  planSize: 2 | 4 | null
   renewalDate: string
   renewalLabel: string
   cycleStartLabel: string
@@ -35,7 +36,8 @@ export interface PortalView {
   nextShoot: PortalAppointmentView | null
   upcoming: PortalAppointmentView[]
   videos: FrameLink[]
-  acuityUrl: string
+  /** Merged scheduler URL for this client only. Null when a subscription client has no private link. */
+  bookingUrl: string | null
   briefHref: string
 }
 
@@ -49,9 +51,16 @@ export async function loadPortalView(
   now: Date = new Date(),
 ): Promise<PortalView> {
   const today = chicagoToday(now)
-  const cycle = resolveCycle(client.renewalDate, today, client.billingAnchorDay)
-  if (cycle.renewalDate !== client.renewalDate) {
-    await store.updateRenewal(client.id, cycle.renewalDate)
+  const showPlan = client.kind === 'subscription'
+  let renewalDate = client.renewalDate ?? ''
+  let cycleStart = ''
+  if (showPlan && client.renewalDate && client.billingAnchorDay) {
+    const cycle = resolveCycle(client.renewalDate, today, client.billingAnchorDay)
+    if (cycle.renewalDate !== client.renewalDate) {
+      await store.updateRenewal(client.id, cycle.renewalDate)
+    }
+    renewalDate = cycle.renewalDate
+    cycleStart = cycle.cycleStart
   }
   const [appointments, countedTypes, briefDates] = await Promise.all([
     store.listAppointmentsForClient(client.id),
@@ -59,18 +68,25 @@ export async function loadPortalView(
     store.findBriefShootDates(client.name, client.email),
   ])
   const visible = appointments.filter((appointment) => !appointment.needsReview)
-  const tally = shootsRemaining({
-    planSize: client.planSize,
-    cycleStart: cycle.cycleStart,
-    renewalDate: cycle.renewalDate,
-    countedTypes,
-    appointments: visible,
-  })
+  const tally =
+    showPlan && client.planSize && cycleStart && renewalDate
+      ? shootsRemaining({
+          planSize: client.planSize,
+          cycleStart,
+          renewalDate,
+          countedTypes,
+          appointments: visible,
+        })
+      : { used: 0, remaining: client.planSize ?? 0 }
   const briefSet = new Set(briefDates)
   const toView = (appointment: AppointmentRecord): PortalAppointmentView => {
     const date = shootDate(appointment.startAt)
     const counts = isCountedType(appointment.appointmentType, countedTypes) && appointment.status !== 'cancelled'
-    const needsBrief = counts && appointment.status !== 'cancelled' && new Date(appointment.startAt).getTime() > now.getTime() && !briefSet.has(date)
+    const needsBrief =
+      counts &&
+      appointment.status !== 'cancelled' &&
+      new Date(appointment.startAt).getTime() > now.getTime() &&
+      !briefSet.has(date)
     return {
       id: appointment.id,
       type: appointment.appointmentType,
@@ -91,16 +107,22 @@ export async function loadPortalView(
     name: client.name,
     email: client.email,
     company: client.company,
+    showPlan,
     planSize: client.planSize,
-    renewalDate: cycle.renewalDate,
-    renewalLabel: formatLongDate(cycle.renewalDate),
-    cycleStartLabel: formatLongDate(cycle.cycleStart),
+    renewalDate,
+    renewalLabel: renewalDate ? formatLongDate(renewalDate) : '',
+    cycleStartLabel: cycleStart ? formatLongDate(cycleStart) : '',
     used: tally.used,
     remaining: tally.remaining,
     nextShoot: next ? toView(next) : null,
     upcoming,
     videos: client.frameioLinks,
-    acuityUrl: acuitySchedulerUrl(client.name, client.email),
+    bookingUrl: bookingUrl({
+      kind: client.kind,
+      schedulingLink: client.schedulingLink,
+      name: client.name,
+      email: client.email,
+    }),
     briefHref: briefFormHref({
       name: client.name,
       email: client.email,

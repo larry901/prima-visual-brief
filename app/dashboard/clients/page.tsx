@@ -54,8 +54,11 @@ export default async function ClientsPage() {
         name: client.name,
         email: client.email,
         company: client.company,
+        kind: client.kind,
         planSize: client.planSize,
         renewalDate: view.renewalDate,
+        schedulingLink: client.schedulingLink,
+        missingSchedulingLink: client.kind === 'subscription' && !client.schedulingLink,
         frameioLinks: client.frameioLinks,
         active: client.active,
         remaining: view.remaining,
@@ -84,7 +87,7 @@ export default async function ClientsPage() {
         <div className="mb-8">
           <h1 className="font-display text-3xl font-semibold">Clients</h1>
           <p className="text-brand-muted text-sm mt-2">
-            Retainer roster for the portal at <span className="text-brand-dark">/portal</span>. Plans are 2 or 4 shoots a month.
+            Subscription clients have a plan, a renewal date, and a private scheduling link. Per-project clients use the shared scheduler.
           </p>
         </div>
         {loadError ? (

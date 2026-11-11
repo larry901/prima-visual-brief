@@ -1,4 +1,5 @@
 export type PlanSize = 2 | 4
+export type ClientKind = 'subscription' | 'project'
 export type AppointmentStatus = 'scheduled' | 'rescheduled' | 'cancelled'
 export type IngestEventName = 'new' | 'rescheduled' | 'cancelled'
 
@@ -12,9 +13,11 @@ export interface ClientRecord {
   name: string
   email: string
   company: string
-  planSize: PlanSize
-  renewalDate: string
-  billingAnchorDay: number
+  kind: ClientKind
+  planSize: PlanSize | null
+  renewalDate: string | null
+  billingAnchorDay: number | null
+  schedulingLink: string | null
   frameioLinks: FrameLink[]
   active: boolean
 }
@@ -23,8 +26,10 @@ export interface ClientInput {
   name: string
   email: string
   company: string
-  planSize: PlanSize
-  renewalDate: string
+  kind: ClientKind
+  planSize: PlanSize | null
+  renewalDate: string | null
+  schedulingLink: string | null
   frameioLinks: FrameLink[]
   active: boolean
 }

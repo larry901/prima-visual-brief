@@ -2,15 +2,18 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import type { FrameLink, PlanSize } from '@/lib/portal/types'
+import type { ClientKind, FrameLink, PlanSize } from '@/lib/portal/types'
 
 export interface RosterClient {
   id: number
   name: string
   email: string
   company: string
-  planSize: PlanSize
+  kind: ClientKind
+  planSize: PlanSize | null
   renewalDate: string
+  schedulingLink: string | null
+  missingSchedulingLink: boolean
   frameioLinks: FrameLink[]
   active: boolean
   remaining: number
@@ -34,8 +37,10 @@ interface Draft {
   name: string
   email: string
   company: string
+  kind: ClientKind
   planSize: PlanSize
   renewalDate: string
+  schedulingLink: string
   active: boolean
   frameioLinks: FrameLink[]
 }
@@ -44,8 +49,10 @@ const emptyDraft = (): Draft => ({
   name: '',
   email: '',
   company: '',
+  kind: 'subscription',
   planSize: 2,
   renewalDate: '',
+  schedulingLink: '',
   active: true,
   frameioLinks: [{ label: '', url: '' }],
 })
@@ -55,8 +62,10 @@ function draftFrom(client: RosterClient): Draft {
     name: client.name,
     email: client.email,
     company: client.company,
-    planSize: client.planSize,
+    kind: client.kind,
+    planSize: client.planSize ?? 2,
     renewalDate: client.renewalDate,
+    schedulingLink: client.schedulingLink ?? '',
     active: client.active,
     frameioLinks: client.frameioLinks.length > 0 ? client.frameioLinks : [{ label: '', url: '' }],
   }
@@ -155,10 +164,19 @@ export default function RosterManager({
                     {client.company && <p className="text-sm text-brand-muted">{client.company}</p>}
                   </div>
                   <div className="text-sm sm:text-right">
-                    <p>
-                      {client.planSize}/month · {client.remaining} left
-                    </p>
-                    <p className="text-brand-muted">Renews {client.renewalLabel}</p>
+                    {client.kind === 'project' ? (
+                      <p>Per project</p>
+                    ) : (
+                      <>
+                        <p>
+                          {client.planSize}/month · {client.remaining} left
+                        </p>
+                        <p className="text-brand-muted">Renews {client.renewalLabel}</p>
+                        {client.missingSchedulingLink && (
+                          <p className="text-red-700">Missing scheduling link</p>
+                        )}
+                      </>
+                    )}
                     <button
                       type="button"
                       className="mt-2 text-sm text-brand-dark underline"
@@ -311,26 +329,62 @@ function ClientForm({
         <Field label="Email" type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
         <Field label="Company" value={form.company} onChange={(company) => setForm({ ...form, company })} />
         <label className="block text-sm">
-          <span className="font-medium">Plan</span>
+          <span className="font-medium">Client type</span>
           <select
             className="input mt-1.5"
-            value={form.planSize}
-            onChange={(event) => setForm({ ...form, planSize: Number(event.target.value) as PlanSize })}
+            value={form.kind}
+            onChange={(event) => setForm({ ...form, kind: event.target.value as ClientKind })}
           >
-            <option value={2}>2 shoots / month</option>
-            <option value={4}>4 shoots / month</option>
+            <option value="subscription">Subscription</option>
+            <option value="project">Per project</option>
           </select>
         </label>
-        <label className="block text-sm">
-          <span className="font-medium">Next renewal</span>
-          <input
-            className="input mt-1.5"
-            type="date"
-            required
-            value={form.renewalDate}
-            onChange={(event) => setForm({ ...form, renewalDate: event.target.value })}
-          />
-        </label>
+        {form.kind === 'subscription' && (
+          <>
+            <label className="block text-sm">
+              <span className="font-medium">Plan</span>
+              <select
+                className="input mt-1.5"
+                value={form.planSize}
+                onChange={(event) => setForm({ ...form, planSize: Number(event.target.value) as PlanSize })}
+              >
+                <option value={2}>2 shoots / month</option>
+                <option value={4}>4 shoots / month</option>
+              </select>
+            </label>
+            <label className="block text-sm">
+              <span className="font-medium">Next renewal</span>
+              <input
+                className="input mt-1.5"
+                type="date"
+                required
+                value={form.renewalDate}
+                onChange={(event) => setForm({ ...form, renewalDate: event.target.value })}
+              />
+            </label>
+            <label className="block text-sm sm:col-span-2">
+              <span className="font-medium">Scheduling link</span>
+              <input
+                className="input mt-1.5"
+                type="url"
+                inputMode="url"
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="https://… include the package code"
+                value={form.schedulingLink}
+                onChange={(event) => setForm({ ...form, schedulingLink: event.target.value })}
+              />
+              <span className="mt-1 block text-xs text-brand-muted">
+                Private to this client. Leave it blank and the portal asks them to contact you instead of opening the paid scheduler.
+              </span>
+            </label>
+          </>
+        )}
+        {form.kind === 'project' && (
+          <p className="text-sm text-brand-muted sm:col-span-2">
+            Per-project clients use the shared scheduler at primavisual.as.me. Their name and email are filled in. No plan or renewal.
+          </p>
+        )}
         <label className="flex items-center gap-2 text-sm mt-6">
           <input
             type="checkbox"

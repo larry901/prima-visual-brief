@@ -12,7 +12,6 @@ export async function seedDemoRoster(store: PortalStore, now: Date = new Date())
   await store.ensureReady()
   const today = chicagoToday(now)
   const mayaRenewal = addDays(today, 18)
-  const andreRenewal = addDays(today, 9)
   const priyaRenewal = addDays(today, 40)
   const upcoming = chicagoWallTimeToUtc(addDays(today, 3), 10, 0).toISOString()
   const past = chicagoWallTimeToUtc(addDays(today, -6), 9, 30).toISOString()
@@ -23,8 +22,10 @@ export async function seedDemoRoster(store: PortalStore, now: Date = new Date())
     name: 'Maya Chen',
     email: 'maya.chen@example.com',
     company: 'Harbor & Co Realty',
+    kind: 'subscription',
     planSize: 4,
     renewalDate: mayaRenewal,
+    schedulingLink: 'https://example.com/schedule/maya?certificate=EXAMPLE-CODE',
     active: true,
     frameioLinks: [
       { label: 'Listing film — 1426 Cortlandt', url: 'https://app.frame.io/reviews/demo-listing-maya' },
@@ -35,8 +36,10 @@ export async function seedDemoRoster(store: PortalStore, now: Date = new Date())
     name: 'Andre Walsh',
     email: 'andre.walsh@example.com',
     company: 'Walsh Group',
-    planSize: 2,
-    renewalDate: andreRenewal,
+    kind: 'project',
+    planSize: null,
+    renewalDate: null,
+    schedulingLink: null,
     active: true,
     frameioLinks: [{ label: 'Just sold — Heights', url: 'https://app.frame.io/reviews/demo-just-sold-andre' }],
   })
@@ -44,8 +47,10 @@ export async function seedDemoRoster(store: PortalStore, now: Date = new Date())
     name: 'Priya Nair',
     email: 'priya.nair@example.com',
     company: 'Nair Homes',
+    kind: 'subscription',
     planSize: 2,
     renewalDate: priyaRenewal,
+    schedulingLink: null,
     active: false,
     frameioLinks: [],
   })
@@ -76,7 +81,16 @@ export async function seedDemoRoster(store: PortalStore, now: Date = new Date())
       clientName: maya.name,
     },
   ])
-  await replaceSeedAppointments(store, andre.id, [])
+  await replaceSeedAppointments(store, andre.id, [
+    {
+      acuityAppointmentId: 'demo-andre-upcoming',
+      appointmentType: 'One-Time Shoot',
+      startAt: chicagoWallTimeToUtc(addDays(today, 4), 13, 0).toISOString(),
+      status: 'scheduled' as const,
+      clientEmail: andre.email,
+      clientName: andre.name,
+    },
+  ])
 
   const existingReview = await store.findAppointmentByAcuityId('demo-unmatched-1')
   if (existingReview) await store.dismissReview(existingReview.id)
@@ -106,8 +120,10 @@ async function upsertClient(
     name: string
     email: string
     company: string
-    planSize: 2 | 4
-    renewalDate: string
+    kind: 'subscription' | 'project'
+    planSize: 2 | 4 | null
+    renewalDate: string | null
+    schedulingLink: string | null
     active: boolean
     frameioLinks: { label: string; url: string }[]
   },

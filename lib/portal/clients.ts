@@ -1,5 +1,5 @@
 import { isIsoDate } from './cycle'
-import type { ClientInput, FrameLink, PlanSize } from './types'
+import type { ClientInput, ClientKind, FrameLink, PlanSize } from './types'
 
 export function parseClientInput(body: unknown): { ok: true; value: ClientInput } | { ok: false; error: string } {
   if (!body || typeof body !== 'object') return { ok: false, error: 'Expected a JSON object' }
@@ -11,17 +11,67 @@ export function parseClientInput(body: unknown): { ok: true; value: ClientInput 
   const active = record.active !== false && record.active !== 'false'
   if (!name) return { ok: false, error: 'Name is required' }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: 'A valid email is required' }
+  const links = parseLinks(record.frameioLinks)
+  if (!links.ok) return links
+  const kind = parseKind(record.kind)
+  if (!kind.ok) return kind
+  const schedulingLink = parseSchedulingLink(record.schedulingLink)
+  if (!schedulingLink.ok) return schedulingLink
+  if (kind.value === 'project') {
+    return {
+      ok: true,
+      value: {
+        name,
+        email,
+        company,
+        kind: 'project',
+        planSize: null,
+        renewalDate: null,
+        schedulingLink: schedulingLink.value,
+        frameioLinks: links.value,
+        active,
+      },
+    }
+  }
   if (record.planSize !== 2 && record.planSize !== 4 && record.planSize !== '2' && record.planSize !== '4') {
     return { ok: false, error: 'Plan size must be 2 or 4' }
   }
   if (!isIsoDate(renewalDate)) return { ok: false, error: 'Renewal date must be YYYY-MM-DD' }
-  const links = parseLinks(record.frameioLinks)
-  if (!links.ok) return links
   const planSize = Number(record.planSize) as PlanSize
   return {
     ok: true,
-    value: { name, email, company, planSize, renewalDate, frameioLinks: links.value, active },
+    value: {
+      name,
+      email,
+      company,
+      kind: 'subscription',
+      planSize,
+      renewalDate,
+      schedulingLink: schedulingLink.value,
+      frameioLinks: links.value,
+      active,
+    },
   }
+}
+
+function parseKind(value: unknown): { ok: true; value: ClientKind } | { ok: false; error: string } {
+  if (value === 'subscription' || value === 'project') return { ok: true, value }
+  return { ok: false, error: 'Client type must be subscription or per project' }
+}
+
+function parseSchedulingLink(value: unknown): { ok: true; value: string | null } | { ok: false; error: string } {
+  if (value == null) return { ok: true, value: null }
+  if (typeof value !== 'string') return { ok: false, error: 'Scheduling link must be a URL' }
+  const trimmed = value.trim()
+  if (!trimmed) return { ok: true, value: null }
+  let url: URL
+  try {
+    url = new URL(trimmed)
+  } catch {
+    return { ok: false, error: 'Scheduling link must be a full https URL' }
+  }
+  if (url.protocol !== 'https:') return { ok: false, error: 'Scheduling link must start with https://' }
+  return { ok: true, value: trimmed }
 }
 
 function parseLinks(value: unknown): { ok: true; value: FrameLink[] } | { ok: false; error: string } {

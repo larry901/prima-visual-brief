@@ -26,8 +26,10 @@ async function roster() {
     name: 'Maya Chen',
     email: 'maya.chen@example.com',
     company: 'Harbor & Co Realty',
+    kind: 'subscription',
     planSize: 4,
     renewalDate: '2026-12-15',
+    schedulingLink: null,
     active: true,
     frameioLinks: [],
   })

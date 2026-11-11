@@ -46,6 +46,20 @@ export function emptyMemoryData(): MemoryData {
   }
 }
 
+function planFields(input: ClientInput, existing: ClientRecord | null) {
+  if (input.kind === 'project') {
+    return { planSize: null, renewalDate: null, billingAnchorDay: null }
+  }
+  const renewalDate = input.renewalDate
+  const anchor =
+    existing && existing.renewalDate === renewalDate && existing.billingAnchorDay
+      ? existing.billingAnchorDay
+      : renewalDate
+        ? Number(renewalDate.slice(8, 10))
+        : null
+  return { planSize: input.planSize, renewalDate, billingAnchorDay: anchor }
+}
+
 function sameInstant(a: string, b: string): boolean {
   return new Date(a).getTime() === new Date(b).getTime()
 }
@@ -59,6 +73,10 @@ export class MemoryStore implements PortalStore {
 
   constructor(data: MemoryData = emptyMemoryData()) {
     this.data = data
+    for (const client of this.data.clients) {
+      if (!client.kind) client.kind = 'subscription'
+      if (client.schedulingLink === undefined) client.schedulingLink = null
+    }
   }
 
   async ensureReady(): Promise<void> {}
@@ -80,14 +98,17 @@ export class MemoryStore implements PortalStore {
     if (await this.findClientByEmail(input.email)) {
       throw new Error('A client with that email already exists')
     }
+    const plan = planFields(input, null)
     const client: ClientRecord = {
       id: this.data.seq.client++,
       name: input.name,
       email: normalizeEmail(input.email),
       company: input.company,
-      planSize: input.planSize,
-      renewalDate: input.renewalDate,
-      billingAnchorDay: Number(input.renewalDate.slice(8, 10)),
+      kind: input.kind,
+      planSize: plan.planSize,
+      renewalDate: plan.renewalDate,
+      billingAnchorDay: plan.billingAnchorDay,
+      schedulingLink: input.schedulingLink,
       frameioLinks: input.frameioLinks,
       active: input.active,
     }
@@ -101,14 +122,15 @@ export class MemoryStore implements PortalStore {
     const email = normalizeEmail(input.email)
     const clash = this.data.clients.find((other) => other.email === email && other.id !== id)
     if (clash) throw new Error('A client with that email already exists')
+    const plan = planFields(input, client)
     client.name = input.name
     client.email = email
     client.company = input.company
-    client.planSize = input.planSize
-    if (client.renewalDate !== input.renewalDate) {
-      client.billingAnchorDay = Number(input.renewalDate.slice(8, 10))
-    }
-    client.renewalDate = input.renewalDate
+    client.kind = input.kind
+    client.planSize = plan.planSize
+    client.renewalDate = plan.renewalDate
+    client.billingAnchorDay = plan.billingAnchorDay
+    client.schedulingLink = input.schedulingLink
     client.frameioLinks = input.frameioLinks
     client.active = input.active
     return client

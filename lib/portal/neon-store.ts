@@ -6,6 +6,7 @@ import type {
   AppointmentRecord,
   AppointmentStatus,
   ClientInput,
+  ClientKind,
   ClientRecord,
   FrameLink,
   NewAppointment,
@@ -19,9 +20,12 @@ function sqlClient() {
   return neon(url)
 }
 
-function asDate(value: unknown): string {
+function asDate(value: unknown): string | null {
+  if (value == null) return null
   if (value instanceof Date) return value.toISOString().slice(0, 10)
-  return String(value).slice(0, 10)
+  const text = String(value)
+  if (!text || text === 'null') return null
+  return text.slice(0, 10)
 }
 
 function asIso(value: unknown): string {
@@ -34,8 +38,36 @@ function asBool(value: unknown): boolean {
   return value === true || value === 't' || value === 'true' || value === 1
 }
 
-function asPlan(value: unknown): PlanSize {
-  return Number(value) === 4 ? 4 : 2
+function asPlan(value: unknown): PlanSize | null {
+  if (value == null || value === '') return null
+  const size = Number(value)
+  if (size === 2 || size === 4) return size
+  return null
+}
+
+function asKind(value: unknown): ClientKind {
+  return value === 'project' ? 'project' : 'subscription'
+}
+
+function asAnchor(value: unknown): number | null {
+  if (value == null || value === '') return null
+  const day = Number(value)
+  if (!Number.isInteger(day) || day < 1 || day > 31) return null
+  return day
+}
+
+function storedPlan(input: ClientInput, existing: ClientRecord | null) {
+  if (input.kind === 'project') {
+    return { planSize: null, renewalDate: null, billingAnchorDay: null }
+  }
+  const renewalDate = input.renewalDate
+  const billingAnchorDay =
+    existing && existing.renewalDate === renewalDate && existing.billingAnchorDay
+      ? existing.billingAnchorDay
+      : renewalDate
+        ? Number(renewalDate.slice(8, 10))
+        : null
+  return { planSize: input.planSize, renewalDate, billingAnchorDay }
 }
 
 function parseLinks(value: unknown): FrameLink[] {
@@ -59,9 +91,11 @@ interface ClientRow {
   name: string
   email: string
   company: string | null
-  plan_size: number
-  renewal_date: string | Date
-  billing_anchor_day: number
+  client_kind: string | null
+  plan_size: number | null
+  renewal_date: string | Date | null
+  billing_anchor_day: number | null
+  scheduling_link: string | null
   frameio_links: string
   active: boolean
 }
@@ -87,9 +121,11 @@ function mapClient(row: ClientRow): ClientRecord {
     name: row.name,
     email: row.email,
     company: row.company ?? '',
+    kind: asKind(row.client_kind),
     planSize: asPlan(row.plan_size),
     renewalDate: asDate(row.renewal_date),
-    billingAnchorDay: Number(row.billing_anchor_day),
+    billingAnchorDay: asAnchor(row.billing_anchor_day),
+    schedulingLink: row.scheduling_link?.trim() || null,
     frameioLinks: parseLinks(row.frameio_links),
     active: asBool(row.active),
   }
@@ -138,9 +174,11 @@ export function createNeonStore(): PortalStore {
         name TEXT NOT NULL,
         email TEXT NOT NULL UNIQUE,
         company TEXT NOT NULL DEFAULT '',
-        plan_size INTEGER NOT NULL CHECK (plan_size IN (2, 4)),
-        renewal_date DATE NOT NULL,
-        billing_anchor_day INTEGER NOT NULL CHECK (billing_anchor_day BETWEEN 1 AND 31),
+        client_kind TEXT NOT NULL DEFAULT 'subscription',
+        plan_size INTEGER CHECK (plan_size IS NULL OR plan_size IN (2, 4)),
+        renewal_date DATE,
+        billing_anchor_day INTEGER CHECK (billing_anchor_day IS NULL OR billing_anchor_day BETWEEN 1 AND 31),
+        scheduling_link TEXT,
         frameio_links TEXT NOT NULL DEFAULT '[]',
         active BOOLEAN NOT NULL DEFAULT TRUE,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -196,6 +234,11 @@ export function createNeonStore(): PortalStore {
       VALUES ('counted_appointment_types', ${JSON.stringify(DEFAULT_COUNTED_TYPES)})
       ON CONFLICT (key) DO NOTHING
     `
+    await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS client_kind TEXT NOT NULL DEFAULT 'subscription'`
+    await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS scheduling_link TEXT`
+    await sql`ALTER TABLE clients ALTER COLUMN plan_size DROP NOT NULL`
+    await sql`ALTER TABLE clients ALTER COLUMN renewal_date DROP NOT NULL`
+    await sql`ALTER TABLE clients ALTER COLUMN billing_anchor_day DROP NOT NULL`
   }
 
   async function clientById(id: number): Promise<ClientRecord | null> {
@@ -229,18 +272,21 @@ export function createNeonStore(): PortalStore {
     async createClient(input: ClientInput) {
       await ensureReady()
       const sql = sqlClient()
-      const anchor = Number(input.renewalDate.slice(8, 10))
+      const plan = storedPlan(input, null)
       try {
         const rows = await sql`
           INSERT INTO clients (
-            name, email, company, plan_size, renewal_date, billing_anchor_day, frameio_links, active
+            name, email, company, client_kind, plan_size, renewal_date, billing_anchor_day,
+            scheduling_link, frameio_links, active
           ) VALUES (
             ${input.name},
             ${normalizeEmail(input.email)},
             ${input.company},
-            ${input.planSize},
-            ${input.renewalDate},
-            ${anchor},
+            ${input.kind},
+            ${plan.planSize},
+            ${plan.renewalDate},
+            ${plan.billingAnchorDay},
+            ${input.schedulingLink},
             ${JSON.stringify(input.frameioLinks)},
             ${input.active}
           )
@@ -258,19 +304,18 @@ export function createNeonStore(): PortalStore {
       const sql = sqlClient()
       const existing = await clientById(id)
       if (!existing) throw new Error('Client not found')
-      const anchor =
-        existing.renewalDate === input.renewalDate
-          ? existing.billingAnchorDay
-          : Number(input.renewalDate.slice(8, 10))
+      const plan = storedPlan(input, existing)
       try {
         const rows = await sql`
           UPDATE clients SET
             name = ${input.name},
             email = ${normalizeEmail(input.email)},
             company = ${input.company},
-            plan_size = ${input.planSize},
-            renewal_date = ${input.renewalDate},
-            billing_anchor_day = ${anchor},
+            client_kind = ${input.kind},
+            plan_size = ${plan.planSize},
+            renewal_date = ${plan.renewalDate},
+            billing_anchor_day = ${plan.billingAnchorDay},
+            scheduling_link = ${input.schedulingLink},
             frameio_links = ${JSON.stringify(input.frameioLinks)},
             active = ${input.active},
             updated_at = NOW()
