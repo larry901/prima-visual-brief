@@ -1,10 +1,14 @@
 import { cookies } from 'next/headers'
 import { redirect, notFound } from 'next/navigation'
-import { getBriefById, VideoDetail } from '@/lib/db'
+import { changedBriefFields } from '@/lib/brief-logic'
+import type { VideoDetail } from '@/lib/db'
+import { ensureDemoSeed } from '@/lib/portal/seed'
+import { getPortalStore } from '@/lib/portal/store'
 import Link from 'next/link'
 import Image from 'next/image'
 import TrackList from '@/app/dashboard/TrackList'
 import LogoutButton from '@/app/dashboard/LogoutButton'
+import DashboardNav from '@/app/dashboard/DashboardNav'
 import CopyForNotion from '@/app/dashboard/CopyForNotion'
 
 function isAuthenticated() {
@@ -20,6 +24,14 @@ function formatDate(dateStr: string) {
   })
 }
 
+function changedFromSnapshot(snapshot: string, brief: { [key: string]: unknown }) {
+  try {
+    return changedBriefFields(JSON.parse(snapshot) as Record<string, unknown>, brief)
+  } catch {
+    return []
+  }
+}
+
 function isImagePath(p: string) {
   return /\.(png|jpe?g|gif|webp|svg)$/i.test(p)
 }
@@ -27,7 +39,10 @@ function isImagePath(p: string) {
 export default async function BriefDetailPage({ params }: { params: { id: string } }) {
   if (!isAuthenticated()) redirect('/dashboard')
 
-  const brief = await getBriefById(Number(params.id))
+  const store = getPortalStore()
+  await store.ensureReady()
+  await ensureDemoSeed(store)
+  const brief = await store.getBriefById(Number(params.id))
   if (!brief) notFound()
 
   const videoTypes: string[] = JSON.parse(brief.video_types || '[]')
@@ -37,9 +52,12 @@ export default async function BriefDetailPage({ params }: { params: { id: string
   return (
     <div className="min-h-screen bg-brand-bg">
       <header className="bg-white border-b border-brand-border">
-        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="max-w-3xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
           <div className="font-display text-xl font-semibold">Prima Visual</div>
-          <LogoutButton />
+          <div className="flex items-center gap-4">
+            <DashboardNav current="briefs" />
+            <LogoutButton />
+          </div>
         </div>
       </header>
 
@@ -58,6 +76,21 @@ export default async function BriefDetailPage({ params }: { params: { id: string
               <p className="text-xs text-brand-muted mt-1">
                 Submitted {formatDate(brief.submitted_at)}
               </p>
+              {brief.edited_by_client && (
+                <p className="text-sm mt-2">
+                  <span className="inline-block bg-amber-100 text-amber-950 px-2 py-0.5 rounded-full text-xs font-medium">
+                    Edited by client
+                  </span>
+                  {brief.updated_at && (
+                    <span className="text-brand-muted text-xs ml-2">Updated {formatDate(brief.updated_at)}</span>
+                  )}
+                </p>
+              )}
+              {brief.previous_snapshot && (
+                <p className="text-xs text-brand-muted mt-2">
+                  Changed: {changedFromSnapshot(brief.previous_snapshot, brief as unknown as Record<string, unknown>).join(', ') || 'details'}
+                </p>
+              )}
             </div>
             <CopyForNotion
               agentName={brief.agent_name}

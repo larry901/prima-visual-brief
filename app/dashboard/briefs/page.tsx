@@ -1,8 +1,10 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { getAllBriefs } from '@/lib/db'
+import { ensureDemoSeed } from '@/lib/portal/seed'
+import { getPortalStore } from '@/lib/portal/store'
 import Link from 'next/link'
 import LogoutButton from '@/app/dashboard/LogoutButton'
+import DashboardNav from '@/app/dashboard/DashboardNav'
 
 function isAuthenticated() {
   const cookieStore = cookies()
@@ -20,14 +22,20 @@ function formatDate(dateStr: string) {
 export default async function BriefsListPage() {
   if (!isAuthenticated()) redirect('/dashboard')
 
-  const briefs = await getAllBriefs()
+  const store = getPortalStore()
+  await store.ensureReady()
+  await ensureDemoSeed(store)
+  const briefs = await store.listAllBriefs()
 
   return (
     <div className="min-h-screen bg-brand-bg">
       <header className="bg-white border-b border-brand-border">
-        <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="font-display text-xl font-semibold">Prima Visual &mdash; Briefs</div>
-          <LogoutButton />
+        <div className="max-w-5xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="font-display text-xl font-semibold">Prima Visual</div>
+          <div className="flex items-center gap-4">
+            <DashboardNav current="briefs" />
+            <LogoutButton />
+          </div>
         </div>
       </header>
 
@@ -59,6 +67,9 @@ export default async function BriefsListPage() {
                       <div>
                         <p className="font-medium group-hover:text-brand-dark">
                           {brief.agent_name}
+                          {brief.edited_by_client && (
+                            <span className="ml-2 text-xs font-normal text-amber-800">Edited by client</span>
+                          )}
                         </p>
                         <p className="text-sm text-brand-muted truncate">{brief.property_address}</p>
                       </div>

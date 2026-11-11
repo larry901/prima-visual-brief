@@ -20,29 +20,51 @@ const defaultVideoDetail = (): VideoDetailState => ({
   script: '',
 })
 
-export default function BriefForm() {
+export default function BriefForm({
+  initialAgentName = '',
+  initialEmail = '',
+  initialShootDate = '',
+  prefill,
+  edit,
+  backHref,
+}: {
+  initialAgentName?: string
+  initialEmail?: string
+  initialShootDate?: string
+  prefill?: {
+    agentName?: string
+    email?: string
+    shootDate?: string
+    propertyAddress?: string
+    agentOnSite?: string
+    gateCode?: string
+    lockboxCode?: string
+    accessNotes?: string
+    videoTypes?: string[]
+    videoDetails?: Record<string, VideoDetailState>
+    driveLink?: string
+    assetNotes?: string
+  }
+  edit?: { id: number; token?: string }
+  backHref?: string
+} = {}) {
   const [submitted, setSubmitted] = useState(false)
+  const [editPath, setEditPath] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Section 1
-  const [agentName, setAgentName] = useState('')
-  const [propertyAddress, setPropertyAddress] = useState('')
-  const [shootDate, setShootDate] = useState('')
-
-  // Section 2
-  const [agentOnSite, setAgentOnSite] = useState('')
-  const [gateCode, setGateCode] = useState('')
-  const [lockboxCode, setLockboxCode] = useState('')
-  const [accessNotes, setAccessNotes] = useState('')
-
-  // Section 3
-  const [selectedVideoTypes, setSelectedVideoTypes] = useState<string[]>([])
-  const [videoDetails, setVideoDetails] = useState<Record<string, VideoDetailState>>({})
-
-  // Section 4
-  const [driveLink, setDriveLink] = useState('')
-  const [assetNotes, setAssetNotes] = useState('')
+  const [agentName, setAgentName] = useState(prefill?.agentName ?? initialAgentName)
+  const [propertyAddress, setPropertyAddress] = useState(prefill?.propertyAddress ?? '')
+  const [shootDate, setShootDate] = useState(prefill?.shootDate ?? initialShootDate)
+  const [agentOnSite, setAgentOnSite] = useState(prefill?.agentOnSite ?? '')
+  const [gateCode, setGateCode] = useState(prefill?.gateCode ?? '')
+  const [lockboxCode, setLockboxCode] = useState(prefill?.lockboxCode ?? '')
+  const [accessNotes, setAccessNotes] = useState(prefill?.accessNotes ?? '')
+  const [selectedVideoTypes, setSelectedVideoTypes] = useState<string[]>(prefill?.videoTypes ?? [])
+  const [videoDetails, setVideoDetails] = useState<Record<string, VideoDetailState>>(prefill?.videoDetails ?? {})
+  const [driveLink, setDriveLink] = useState(prefill?.driveLink ?? '')
+  const [assetNotes, setAssetNotes] = useState(prefill?.assetNotes ?? '')
+  const email = prefill?.email ?? initialEmail
 
   const toggleVideoType = (type: string) => {
     if (selectedVideoTypes.includes(type)) {
@@ -73,8 +95,8 @@ export default function BriefForm() {
     setLoading(true)
 
     try {
-      const res = await fetch('/api/submit-brief', {
-        method: 'POST',
+      const res = await fetch(edit ? `/api/briefs/${edit.id}` : '/api/submit-brief', {
+        method: edit ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           agentName,
@@ -88,6 +110,8 @@ export default function BriefForm() {
           videoDetails,
           driveLink,
           assetNotes,
+          clientEmail: email,
+          editToken: edit?.token,
         }),
       })
 
@@ -95,7 +119,8 @@ export default function BriefForm() {
         const data = await res.json()
         throw new Error(data.error || 'Submission failed')
       }
-
+      const data = await res.json()
+      if (typeof data.editPath === 'string') setEditPath(data.editPath)
       setSubmitted(true)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
@@ -113,11 +138,21 @@ export default function BriefForm() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h1 className="font-display text-3xl font-semibold mb-3">Brief submitted!</h1>
+          <h1 className="font-display text-3xl font-semibold mb-3">{edit ? 'Brief updated' : 'Brief submitted!'}</h1>
           <p className="text-brand-muted text-lg">We&apos;ll see you at the shoot.</p>
           <p className="text-brand-muted text-sm mt-4">
-            A copy has been sent to clients@primavisual.io
+            {edit ? 'Larry has been notified of your changes.' : 'A copy has been sent to clients@primavisual.io'}
           </p>
+          {editPath && (
+            <a href={editPath} className="inline-block mt-6 btn-primary">
+              Edit this brief
+            </a>
+          )}
+          {backHref && (
+            <a href={backHref} className="block mt-4 text-sm text-brand-muted">
+              Back to your portal
+            </a>
+          )}
         </div>
       </div>
     )
@@ -129,17 +164,30 @@ export default function BriefForm() {
       <header className="bg-white border-b border-brand-border sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="font-display text-xl font-semibold tracking-tight">Prima Visual</div>
-          <div className="text-xs text-brand-muted">Complete 24 hrs before shoot</div>
+          <div className="text-xs text-brand-muted">{edit ? 'Editing your brief' : 'Complete 24 hrs before shoot'}</div>
         </div>
       </header>
 
       <div className="max-w-2xl mx-auto px-4 py-8 pb-20">
         {/* Page title */}
         <div className="mb-10">
-          <h1 className="font-display text-4xl font-semibold mb-2">Pre-Shoot Creative Brief</h1>
+          {backHref && (
+            <a href={backHref} className="text-sm text-brand-muted hover:text-brand-dark inline-block mb-4">
+              &larr; Back
+            </a>
+          )}
+          <h1 className="font-display text-4xl font-semibold mb-2">{edit ? 'Edit your brief' : 'Pre-Shoot Creative Brief'}</h1>
           <p className="text-brand-muted">
-            Help us bring your vision to life. Complete this form at least 24 hours before your shoot.
+            {edit
+              ? 'Updates save over this submission. You can edit until the shoot starts.'
+              : 'Help us bring your vision to life. Complete this form at least 24 hours before your shoot.'}
           </p>
+          {email && (
+            <p className="text-sm text-brand-muted mt-3">
+              Prefilled for {email}
+              {shootDate ? ` · shoot ${shootDate}` : ''}.
+            </p>
+          )}
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-8">
@@ -323,7 +371,7 @@ export default function BriefForm() {
             disabled={loading}
             className="w-full btn-primary py-4 text-base disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Submitting\u2026' : 'Submit Creative Brief'}
+            {loading ? 'Saving\u2026' : edit ? 'Save changes' : 'Submit Creative Brief'}
           </button>
         </form>
       </div>
