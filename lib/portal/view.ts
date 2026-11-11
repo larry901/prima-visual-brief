@@ -9,7 +9,13 @@ import {
   resolveCycle,
   shootsRemaining,
 } from './cycle'
-import type { AppointmentRecord, ClientRecord, PortalStore } from './types'
+import { clientEmailAddresses } from './clients'
+import type { AppointmentRecord, ClientRecord, PlanSize, PortalStore } from './types'
+
+/** Unit under the plan-size number. A 1-shoot plan uses the singular. */
+export function shootsPerMonthLabel(planSize: number | null): string {
+  return planSize === 1 ? 'shoot / month' : 'shoots / month'
+}
 
 export interface PortalAppointmentView {
   id: number
@@ -27,7 +33,7 @@ export interface PortalView {
   email: string
   company: string
   showPlan: boolean
-  planSize: 2 | 4 | null
+  planSize: PlanSize | null
   renewalDate: string
   renewalLabel: string
   cycleStartLabel: string
@@ -65,11 +71,11 @@ export async function loadPortalView(
   const [appointments, countedTypes, briefDates] = await Promise.all([
     store.listAppointmentsForClient(client.id),
     store.getCountedTypes(),
-    store.findBriefShootDates(client.name, client.email),
+    store.findBriefShootDates(client.name, clientEmailAddresses(client)),
   ])
   const visible = appointments.filter((appointment) => !appointment.needsReview)
   const tally =
-    showPlan && client.planSize && cycleStart && renewalDate
+    showPlan && client.planSize != null && cycleStart && renewalDate
       ? shootsRemaining({
           planSize: client.planSize,
           cycleStart,

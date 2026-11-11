@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { isAuthenticated } from '@/lib/auth'
-import { parseClientInput } from '@/lib/portal/clients'
+import { attachClientEmails, parseClientInput } from '@/lib/portal/clients'
 import { getPortalStore } from '@/lib/portal/store'
 
 export const dynamic = 'force-dynamic'
@@ -15,7 +15,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     const store = getPortalStore()
     await store.ensureReady()
     const client = await store.updateClient(id, parsed.value)
-    await store.attachUnmatched(client.email, client.id)
+    await attachClientEmails(store, client)
     return NextResponse.json({ client })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Could not save client'

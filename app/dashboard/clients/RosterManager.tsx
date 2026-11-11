@@ -8,6 +8,7 @@ export interface RosterClient {
   id: number
   name: string
   email: string
+  additionalEmails: string[]
   company: string
   kind: ClientKind
   planSize: PlanSize | null
@@ -36,6 +37,7 @@ export interface ReviewItem {
 interface Draft {
   name: string
   email: string
+  additionalEmails: string[]
   company: string
   kind: ClientKind
   planSize: PlanSize
@@ -48,6 +50,7 @@ interface Draft {
 const emptyDraft = (): Draft => ({
   name: '',
   email: '',
+  additionalEmails: [],
   company: '',
   kind: 'subscription',
   planSize: 2,
@@ -61,6 +64,7 @@ function draftFrom(client: RosterClient): Draft {
   return {
     name: client.name,
     email: client.email,
+    additionalEmails: client.additionalEmails ?? [],
     company: client.company,
     kind: client.kind,
     planSize: client.planSize ?? 2,
@@ -161,6 +165,9 @@ export default function RosterManager({
                       )}
                     </p>
                     <p className="text-sm text-brand-muted">{client.email}</p>
+                    {client.additionalEmails.length > 0 && (
+                      <p className="text-sm text-brand-muted">{client.additionalEmails.join(', ')}</p>
+                    )}
                     {client.company && <p className="text-sm text-brand-muted">{client.company}</p>}
                   </div>
                   <div className="text-sm sm:text-right">
@@ -319,7 +326,51 @@ function ClientForm({
     >
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Name" value={form.name} onChange={(name) => setForm({ ...form, name })} required />
-        <Field label="Email" type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
+        <Field label="Primary email" type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
+        <div className="sm:col-span-2 space-y-2">
+          <span className="font-medium">Also on this account</span>
+          <p className="text-xs text-brand-muted">
+            Each address can sign in, and Acuity bookings from any of them count toward this client. An email can only belong to one client.
+          </p>
+          {form.additionalEmails.map((value, index) => (
+            <div key={index} className="flex gap-2">
+              <input
+                className="input"
+                type="email"
+                inputMode="email"
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="name@example.com"
+                aria-label={`Additional email ${index + 1}`}
+                value={value}
+                onChange={(event) => {
+                  const additionalEmails = [...form.additionalEmails]
+                  additionalEmails[index] = event.target.value
+                  setForm({ ...form, additionalEmails })
+                }}
+              />
+              <button
+                type="button"
+                className="text-sm text-brand-dark underline shrink-0"
+                onClick={() =>
+                  setForm({
+                    ...form,
+                    additionalEmails: form.additionalEmails.filter((_, item) => item !== index),
+                  })
+                }
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            className="text-sm text-brand-dark underline"
+            onClick={() => setForm({ ...form, additionalEmails: [...form.additionalEmails, ''] })}
+          >
+            Add email
+          </button>
+        </div>
         <Field label="Company" value={form.company} onChange={(company) => setForm({ ...form, company })} />
         <label className="block text-sm">
           <span className="font-medium">Client type</span>
@@ -341,6 +392,7 @@ function ClientForm({
                 value={form.planSize}
                 onChange={(event) => setForm({ ...form, planSize: Number(event.target.value) as PlanSize })}
               >
+                <option value={1}>1 shoot / month</option>
                 <option value={2}>2 shoots / month</option>
                 <option value={4}>4 shoots / month</option>
               </select>

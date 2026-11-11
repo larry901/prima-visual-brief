@@ -1,7 +1,7 @@
 import Countdown from './Countdown'
 import SignOutButton from './SignOutButton'
 import type { PortalBriefCard } from '@/lib/brief-service'
-import type { PortalView } from '@/lib/portal/view'
+import { shootsPerMonthLabel, type PortalView } from '@/lib/portal/view'
 export default function PortalHome({ view, briefs }: { view: PortalView; briefs: PortalBriefCard[] }) {
   const firstName = view.name.split(/\s+/)[0] || view.name
   const needsBrief = view.upcoming.some((appointment) => appointment.needsBrief)
@@ -33,7 +33,7 @@ export default function PortalHome({ view, briefs }: { view: PortalView; briefs:
                 <article>
                   <p className="portal-kicker">Plan</p>
                   <p className="portal-stat">{view.planSize}</p>
-                  <p className="portal-stat-label">shoots / month</p>
+                  <p className="portal-stat-label">{shootsPerMonthLabel(view.planSize)}</p>
                 </article>
                 <article>
                   <p className="portal-kicker">This cycle</p>

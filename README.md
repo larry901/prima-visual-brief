@@ -123,7 +123,7 @@ The `@aws-sdk/client-s3` package is dynamically imported at runtime only when S3
 
 Clients sign in at `/portal`. There are two kinds:
 
-- **Subscription.** Plan of 2 or 4 shoots a month, a renewal date, shoots left this cycle, and a private Acuity scheduling link (the full URL, including any certificate or package code). The portal embeds that link and adds `firstName`, `lastName`, and `email` without dropping the code. If the link is blank, the portal says **Contact us to schedule** and does not open the paid public scheduler. The roster flags that client.
+- **Subscription.** Plan of 1, 2, or 4 shoots a month, a renewal date, shoots left this cycle, and a private Acuity scheduling link (the full URL, including any certificate or package code). The portal embeds that link and adds `firstName`, `lastName`, and `email` without dropping the code. If the link is blank, the portal says **Contact us to schedule** and does not open the paid public scheduler. The roster flags that client. A client can list extra emails (a team on one retainer). Each address signs in to the same portal, and bookings from any of them count toward that plan. An email can only be on one client.
 - **Per project.** No plan and no renewal, so those blocks are hidden. Booking uses the public scheduler at `https://primavisual.as.me` with the client's name and email filled in.
 
 Both kinds see one card labeled **View your Videos**, or “Videos coming soon” when that link is empty, then the briefs they submitted, the countdown, and **Fill out your brief**.
@@ -138,13 +138,13 @@ There are no reminder emails or texts. Crystal keeps doing those.
 
 ### Cycle rules
 
-The renewal date is the day a new cycle starts. On that morning in America/Chicago the plan resets to 2 or 4 and the renewal date moves forward one month. The billing day is remembered, so a plan that renews on the 31st uses the last day of a short month and returns to the 31st afterward (January 31 → February 28/29 → March 31).
+The renewal date is the day a new cycle starts. On that morning in America/Chicago the plan resets to its monthly count (1, 2, or 4) and the renewal date moves forward one month. The billing day is remembered, so a plan that renews on the 31st uses the last day of a short month and returns to the 31st afterward (January 31 → February 28/29 → March 31).
 
 Only appointment types in the dashboard list **Shoots that count** use up a shoot. The starting list includes Listing Shoot, Property Shoot, Video Shoot, Real Estate Shoot, Photo & Video Shoot, and One-Time Shoot (the shoot type on the public scheduler today). Discovery Call does not count unless someone adds it. Cancelled shoots do not count. Rescheduled shoots count once.
 
 ### Storage
 
-The portal uses the Neon database the brief form already uses (`POSTGRES_URL`). New tables (`clients`, `appointments`, `magic_links`, `portal_sessions`, `portal_settings`) are created on the first portal, roster, or ingest request. No second database and no paid plan.
+The portal uses the Neon database the brief form already uses (`POSTGRES_URL`). New tables (`clients`, `client_emails`, `appointments`, `magic_links`, `portal_sessions`, `portal_settings`) are created on the first portal, roster, or ingest request. `client_emails` only stores addresses beyond the primary, so existing clients are unchanged. No second database and no paid plan.
 
 If this project does not have Neon yet:
 
@@ -157,7 +157,7 @@ Locally, with no `POSTGRES_URL`, the portal stores its demo data in `.data/porta
 
 ### Magic-link sign-in
 
-`POST /api/portal/login` with `{ "email": "..." }` emails a one-time link when that address belongs to an active client. Unknown addresses get the same response, so the roster is not listed. Links expire in 20 minutes. The session cookie lasts 14 days. Set `APP_URL` in production so the link host is `https://brief.primavisual.io`.
+`POST /api/portal/login` with `{ "email": "..." }` emails a one-time link when that address is the primary email or an additional email on an active client. The link opens that client's portal. Unknown addresses get the same response, so the roster is not listed. Links expire in 20 minutes. The session cookie lasts 14 days. Set `APP_URL` in production so the link host is `https://brief.primavisual.io`.
 
 ### Ingesting Acuity notification emails
 
@@ -184,7 +184,7 @@ Content-Type: application/json
 | Field | Required | Notes |
 |---|---|---|
 | `event` | Yes | `new`, `rescheduled`, or `cancelled` |
-| `client_email` | Yes | Matched to the roster, case-insensitive |
+| `client_email` | Yes | Matched to a client's primary or additional email, case-insensitive. The shoot counts toward that client. |
 | `client_name` | Yes | Stored for the review list |
 | `appointment_type` | Yes | Compared to the counted-types list |
 | `start` | Yes | ISO 8601 datetime. The new time for a reschedule. |
@@ -193,7 +193,7 @@ Content-Type: application/json
 
 `event: "new"` maps to status `scheduled`. Repeating the same event does not create a second row. A repeated `new` will not move a shoot that was already rescheduled or cancelled. Without an Acuity id, a reschedule or cancellation updates a row only when exactly one open appointment of that type exists for the email. If several could match, the event is stored for review and the existing rows are left alone.
 
-An email whose address is not on the roster is saved with `needs_review: true` and shows under **Needs review** in the dashboard. It is not dropped, and it does not count against a plan. Adding that email to the roster attaches the waiting rows.
+An email whose address is not on the roster is saved with `needs_review: true` and shows under **Needs review** in the dashboard. It is not dropped, and it does not count against a plan. Adding that address as a client's primary or additional email attaches the waiting rows.
 
 ```json
 { "ok": true, "action": "created", "appointment_id": 12, "needs_review": false, "review_reason": null }

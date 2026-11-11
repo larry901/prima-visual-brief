@@ -1,5 +1,5 @@
 import type { BriefRow, BriefUpdate, NewBriefRecord } from '../db'
-import { readFrameioUrl } from './clients'
+import { attachClientEmails, clientEmailAddresses, normalizeClientEmails, readFrameioUrl, emailList } from './clients'
 import { DEFAULT_COUNTED_TYPES } from './cycle'
 import { clientOwnsBrief } from '../brief-logic'
 import { normalizeEmail } from './ingest'
@@ -83,6 +83,7 @@ export class MemoryStore implements PortalStore {
       if (!client.kind) client.kind = 'subscription'
       if (client.schedulingLink === undefined) client.schedulingLink = null
       if (!client.frameioUrl) client.frameioUrl = readFrameioUrl(legacy.frameioLinks)
+      client.additionalEmails = emailList(client.additionalEmails).filter((email) => email !== normalizeEmail(client.email))
     }
     if (!this.data.briefs) this.data.briefs = []
     if (!this.data.seq.brief) this.data.seq.brief = 1
@@ -100,18 +101,18 @@ export class MemoryStore implements PortalStore {
 
   async findClientByEmail(email: string): Promise<ClientRecord | null> {
     const norm = normalizeEmail(email)
-    return this.data.clients.find((client) => client.email === norm) ?? null
+    return this.data.clients.find((client) => clientEmailAddresses(client).includes(norm)) ?? null
   }
 
   async createClient(input: ClientInput): Promise<ClientRecord> {
-    if (await this.findClientByEmail(input.email)) {
-      throw new Error('A client with that email already exists')
-    }
+    const emails = normalizeClientEmails(input)
+    this.assertEmailsAvailable(clientEmailAddresses(emails))
     const plan = planFields(input, null)
     const client: ClientRecord = {
       id: this.data.seq.client++,
       name: input.name,
-      email: normalizeEmail(input.email),
+      email: emails.email,
+      additionalEmails: emails.additionalEmails,
       company: input.company,
       kind: input.kind,
       planSize: plan.planSize,
@@ -122,18 +123,19 @@ export class MemoryStore implements PortalStore {
       active: input.active,
     }
     this.data.clients.push(client)
+    await attachClientEmails(this, client)
     return client
   }
 
   async updateClient(id: number, input: ClientInput): Promise<ClientRecord> {
     const client = await this.getClient(id)
     if (!client) throw new Error('Client not found')
-    const email = normalizeEmail(input.email)
-    const clash = this.data.clients.find((other) => other.email === email && other.id !== id)
-    if (clash) throw new Error('A client with that email already exists')
+    const emails = normalizeClientEmails(input)
+    this.assertEmailsAvailable(clientEmailAddresses(emails), id)
     const plan = planFields(input, client)
     client.name = input.name
-    client.email = email
+    client.email = emails.email
+    client.additionalEmails = emails.additionalEmails
     client.company = input.company
     client.kind = input.kind
     client.planSize = plan.planSize
@@ -142,7 +144,18 @@ export class MemoryStore implements PortalStore {
     client.schedulingLink = input.schedulingLink
     client.frameioUrl = input.frameioUrl
     client.active = input.active
+    await attachClientEmails(this, client)
     return client
+  }
+
+  private assertEmailsAvailable(emails: string[], exceptId?: number) {
+    const wanted = new Set(emails)
+    for (const other of this.data.clients) {
+      if (other.id === exceptId) continue
+      for (const email of clientEmailAddresses(other)) {
+        if (wanted.has(email)) throw new Error('A client with that email already exists')
+      }
+    }
   }
 
   async updateRenewal(id: number, renewalDate: string): Promise<void> {
@@ -277,14 +290,15 @@ export class MemoryStore implements PortalStore {
     this.data.sessions = this.data.sessions.filter((session) => session.tokenHash !== tokenHash)
   }
 
-  async findBriefShootDates(name: string, email: string): Promise<string[]> {
+  async findBriefShootDates(name: string, email: string | string[]): Promise<string[]> {
     const nameKey = name.trim().toLowerCase()
-    const emailKey = normalizeEmail(email)
+    const emails = emailList(email)
+    const emailSet = new Set(emails)
     const legacy = this.data.briefShootDates
-      .filter((brief) => brief.name.trim().toLowerCase() === nameKey || brief.email.trim().toLowerCase() === emailKey)
+      .filter((brief) => brief.name.trim().toLowerCase() === nameKey || emailSet.has(brief.email.trim().toLowerCase()))
       .map((brief) => brief.shootDate.slice(0, 10))
     const owned = this.data.briefs
-      .filter((brief) => clientOwnsBrief(brief, { id: -1, email: emailKey }) || (brief.client_email || '').toLowerCase() === emailKey)
+      .filter((brief) => clientOwnsBrief(brief, { id: -1, email: emails[0] ?? '', emails }))
       .map((brief) => brief.shoot_date.slice(0, 10))
     return Array.from(new Set([...legacy, ...owned]))
   }
@@ -297,8 +311,11 @@ export class MemoryStore implements PortalStore {
     return this.data.briefs.find((brief) => brief.id === id) ?? null
   }
 
-  async listBriefsForClient(clientId: number, email: string): Promise<BriefRow[]> {
-    return (await this.listAllBriefs()).filter((brief) => clientOwnsBrief(brief, { id: clientId, email }))
+  async listBriefsForClient(clientId: number, email: string | string[]): Promise<BriefRow[]> {
+    const emails = emailList(email)
+    return (await this.listAllBriefs()).filter((brief) =>
+      clientOwnsBrief(brief, { id: clientId, email: emails[0] ?? '', emails }),
+    )
   }
 
   async getBriefByEditTokenHash(tokenHash: string): Promise<BriefRow | null> {

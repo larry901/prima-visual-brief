@@ -1,5 +1,79 @@
 import { isIsoDate } from './cycle'
+import { normalizeEmail } from './ingest'
 import type { ClientInput, ClientKind, PlanSize } from './types'
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+/** Every address that should sign in and match bookings for this client, primary first. */
+export function clientEmailAddresses(client: { email: string; additionalEmails?: string[] | null }): string[] {
+  return emailList([client.email, ...(client.additionalEmails ?? [])])
+}
+
+export function emailList(value: string | string[] | null | undefined): string[] {
+  const source = Array.isArray(value) ? value : value ? [value] : []
+  const seen = new Set<string>()
+  const emails: string[] = []
+  for (const entry of source) {
+    if (typeof entry !== 'string') continue
+    const email = normalizeEmail(entry)
+    if (!email || seen.has(email)) continue
+    seen.add(email)
+    emails.push(email)
+  }
+  return emails
+}
+
+/** Primary plus extras, ready to store. Rejects a bad address or an extra that repeats the primary. */
+export function normalizeClientEmails(input: { email: string; additionalEmails?: string[] | null }): {
+  email: string
+  additionalEmails: string[]
+} {
+  const email = normalizeEmail(input.email)
+  if (!EMAIL_RE.test(email)) throw new Error('A valid email is required')
+  const additionalEmails: string[] = []
+  const seen = new Set<string>([email])
+  for (const entry of input.additionalEmails ?? []) {
+    if (typeof entry !== 'string') throw new Error('Additional emails must be valid email addresses')
+    const extra = normalizeEmail(entry)
+    if (!extra) continue
+    if (!EMAIL_RE.test(extra)) throw new Error('Additional emails must be valid email addresses')
+    if (extra === email) throw new Error('Additional emails must be different from the primary email')
+    if (seen.has(extra)) continue
+    seen.add(extra)
+    additionalEmails.push(extra)
+  }
+  return { email, additionalEmails }
+}
+
+export async function attachClientEmails(
+  store: { attachUnmatched(email: string, clientId: number): Promise<void> },
+  client: { id: number; email: string; additionalEmails?: string[] | null },
+): Promise<void> {
+  for (const email of clientEmailAddresses(client)) {
+    await store.attachUnmatched(email, client.id)
+  }
+}
+
+/** JSON from the roster form: a number, or the same digits as a string. */
+export function parsePlanSize(value: unknown): PlanSize | null {
+  if (value === 1 || value === 2 || value === 4) return value
+  if (value === '1' || value === '2' || value === '4') return Number(value) as PlanSize
+  return null
+}
+
+/**
+ * Plan size as stored in Postgres. Neon may return the integer as a number or a string.
+ * Booleans are rejected so `true` is not read as a 1-shoot plan.
+ */
+export function readStoredPlanSize(value: unknown): PlanSize | null {
+  const parsed = parsePlanSize(value)
+  if (parsed) return parsed
+  if (typeof value !== 'number' && typeof value !== 'string') return null
+  if (typeof value === 'string' && value.trim() === '') return null
+  const size = Number(value)
+  if (size === 1 || size === 2 || size === 4) return size
+  return null
+}
 
 export function parseClientInput(body: unknown): { ok: true; value: ClientInput } | { ok: false; error: string } {
   if (!body || typeof body !== 'object') return { ok: false, error: 'Expected a JSON object' }
@@ -10,7 +84,9 @@ export function parseClientInput(body: unknown): { ok: true; value: ClientInput 
   const renewalDate = typeof record.renewalDate === 'string' ? record.renewalDate : ''
   const active = record.active !== false && record.active !== 'false'
   if (!name) return { ok: false, error: 'Name is required' }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: 'A valid email is required' }
+  if (!EMAIL_RE.test(email)) return { ok: false, error: 'A valid email is required' }
+  const additionalEmails = parseAdditionalEmails(record.additionalEmails, email)
+  if (!additionalEmails.ok) return additionalEmails
   const frameioUrl = parseFrameioUrl(record.frameioUrl ?? record.frameioLinks)
   if (!frameioUrl.ok) return frameioUrl
   const kind = parseKind(record.kind)
@@ -23,6 +99,7 @@ export function parseClientInput(body: unknown): { ok: true; value: ClientInput 
       value: {
         name,
         email,
+        additionalEmails: additionalEmails.value,
         company,
         kind: 'project',
         planSize: null,
@@ -33,16 +110,15 @@ export function parseClientInput(body: unknown): { ok: true; value: ClientInput 
       },
     }
   }
-  if (record.planSize !== 2 && record.planSize !== 4 && record.planSize !== '2' && record.planSize !== '4') {
-    return { ok: false, error: 'Plan size must be 2 or 4' }
-  }
+  const planSize = parsePlanSize(record.planSize)
+  if (!planSize) return { ok: false, error: 'Plan size must be 1, 2, or 4' }
   if (!isIsoDate(renewalDate)) return { ok: false, error: 'Renewal date must be YYYY-MM-DD' }
-  const planSize = Number(record.planSize) as PlanSize
   return {
     ok: true,
     value: {
       name,
       email,
+      additionalEmails: additionalEmails.value,
       company,
       kind: 'subscription',
       planSize,
@@ -51,6 +127,24 @@ export function parseClientInput(body: unknown): { ok: true; value: ClientInput 
       frameioUrl: frameioUrl.value,
       active,
     },
+  }
+}
+
+function parseAdditionalEmails(
+  value: unknown,
+  primary: string,
+): { ok: true; value: string[] } | { ok: false; error: string } {
+  if (value == null || value === '') return { ok: true, value: [] }
+  const source = Array.isArray(value) ? value : typeof value === 'string' ? value.split(/\r?\n|,/) : null
+  if (!source) return { ok: false, error: 'Additional emails must be a list' }
+  try {
+    return { ok: true, value: normalizeClientEmails({ email: primary, additionalEmails: source as string[] }).additionalEmails }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Additional emails must be valid email addresses'
+    if (message === 'A valid email is required') {
+      return { ok: false, error: 'Additional emails must be valid email addresses' }
+    }
+    return { ok: false, error: message }
   }
 }
 
