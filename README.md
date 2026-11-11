@@ -126,7 +126,7 @@ Clients sign in at `/portal`. There are two kinds:
 - **Subscription.** Plan of 2 or 4 shoots a month, a renewal date, shoots left this cycle, and a private Acuity scheduling link (the full URL, including any certificate or package code). The portal embeds that link and adds `firstName`, `lastName`, and `email` without dropping the code. If the link is blank, the portal says **Contact us to schedule** and does not open the paid public scheduler. The roster flags that client.
 - **Per project.** No plan and no renewal, so those blocks are hidden. Booking uses the public scheduler at `https://primavisual.as.me` with the client's name and email filled in.
 
-Both kinds see one Frame.io card for all of their footage — or “Videos coming soon” when that link is empty — then the briefs they submitted, the countdown, and **Fill out your brief**.
+Both kinds see one card labeled **View your Videos**, or “Videos coming soon” when that link is empty, then the briefs they submitted, the countdown, and **Fill out your brief**.
 
 A client only sees their own briefs, matched by roster id or email. They can edit a brief until the shoot starts (the appointment time that day, or midnight Chicago when the brief only has a date). After that it is read-only. Edits save over the same submission, keep the previous version, mark **Edited by client** on the dashboard, and email the team through Resend. The confirmation screen also includes a private edit link.
 

@@ -87,8 +87,7 @@ export default function PortalHome({ view, briefs }: { view: PortalView; briefs:
                   </svg>
                 </span>
                 <span className="portal-film-copy">
-                  <span className="portal-film-kicker">Frame.io</span>
-                  <span className="portal-film-label">All your footage on Frame.io</span>
+                  <span className="portal-film-label">View your Videos</span>
                 </span>
                 <span className="portal-film-watch">Watch</span>
               </a>
