@@ -3,6 +3,8 @@ import { describe, it } from 'node:test'
 import {
   briefEditClosesAt,
   briefIsEditable,
+  briefPortalCutoff,
+  briefShownInPortal,
   canAccessBrief,
   changedBriefFields,
   clientOwnsBrief,
@@ -44,6 +46,23 @@ describe('brief edit window', () => {
   it('refuses an invalid shoot date', () => {
     assert.equal(briefEditClosesAt('not-a-date'), null)
     assert.equal(briefIsEditable(new Date(), null), false)
+  })
+})
+
+describe('portal brief list cutoff', () => {
+  const now = new Date('2026-11-11T18:00:00.000Z')
+
+  it('uses a Chicago day two months back, keeps that day, and always keeps a future shoot', () => {
+    assert.equal(briefPortalCutoff(now), '2026-09-11')
+    assert.equal(briefShownInPortal({ shoot_date: '2026-09-11', submitted_at: '2024-01-01T00:00:00.000Z' }, now), true)
+    assert.equal(briefShownInPortal({ shoot_date: '2026-09-10', submitted_at: '2026-11-11T18:00:00.000Z' }, now), false)
+    assert.equal(briefShownInPortal({ shoot_date: '2027-04-02', submitted_at: '2020-01-01T00:00:00.000Z' }, now), true)
+  })
+
+  it('falls back to the Chicago submission day when there is no shoot date', () => {
+    assert.equal(briefShownInPortal({ shoot_date: '', submitted_at: '2026-09-11T16:00:00.000Z' }, now), true)
+    assert.equal(briefShownInPortal({ shoot_date: 'not-a-date', submitted_at: '2026-06-01T16:00:00.000Z' }, now), false)
+    assert.equal(briefShownInPortal({ shoot_date: '', submitted_at: '' }, now), false)
   })
 })
 

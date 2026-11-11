@@ -1,6 +1,6 @@
 import type { BriefRow } from './db'
-import { formatLongDate } from './portal/cycle'
-import { changedBriefFields, briefEditClosesAt, briefIsEditable, canAccessBrief, type BriefOwner } from './brief-logic'
+import { formatLongDate, isIsoDate } from './portal/cycle'
+import { changedBriefFields, briefEditClosesAt, briefIsEditable, briefShownInPortal, canAccessBrief, type BriefOwner } from './brief-logic'
 import type { PortalStore } from './portal/types'
 
 export function briefSnapshot(brief: BriefRow): string {
@@ -54,10 +54,10 @@ export async function portalBriefCards(store: PortalStore, client: BriefOwner, n
     store.listBriefsForClient(client.id, client.email),
     shootStartsForClient(store, client.id),
   ])
-  return briefs.map((brief) => ({
+  return briefs.filter((brief) => briefShownInPortal(brief, now)).map((brief) => ({
     id: brief.id,
     property: brief.property_address,
-    shootLabel: formatLongDate(brief.shoot_date.slice(0, 10)),
+    shootLabel: isIsoDate(brief.shoot_date.slice(0, 10)) ? formatLongDate(brief.shoot_date.slice(0, 10)) : 'Date not set',
     submittedLabel: new Intl.DateTimeFormat('en-US', {
       timeZone: 'America/Chicago',
       month: 'short',

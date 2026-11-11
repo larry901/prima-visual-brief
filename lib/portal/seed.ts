@@ -95,6 +95,14 @@ export async function seedDemoRoster(store: PortalStore, now: Date = new Date())
     highlights: 'Twilight exterior and the upstairs landing.',
   })
   await upsertDemoBrief(store, {
+    clientId: maya.id,
+    email: maya.email,
+    name: maya.name,
+    property: '12 Archive Ln, Houston, TX 77008',
+    shootDate: addDays(today, -100),
+    highlights: 'Older film kept on file, not listed in the portal.',
+  })
+  await upsertDemoBrief(store, {
     clientId: andre.id,
     email: andre.email,
     name: andre.name,

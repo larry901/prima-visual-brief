@@ -128,7 +128,7 @@ Clients sign in at `/portal`. There are two kinds:
 
 Both kinds see one card labeled **View your Videos**, or “Videos coming soon” when that link is empty, then the briefs they submitted, the countdown, and **Fill out your brief**.
 
-A client only sees their own briefs, matched by roster id or email. They can edit a brief until the shoot starts (the appointment time that day, or midnight Chicago when the brief only has a date). After that it is read-only. Edits save over the same submission, keep the previous version, mark **Edited by client** on the dashboard, and email the team through Resend. The confirmation screen also includes a private edit link.
+A client only sees their own briefs from the last two months in America/Chicago, using the shoot date, or the submission date when there is no shoot date. A future shoot always stays on the list. Older briefs are not deleted: staff still see them, and a direct link still opens one read-only. They can edit a brief until the shoot starts (the appointment time that day, or midnight Chicago when the brief only has a date). After that it is read-only. Edits save over the same submission, keep the previous version, mark **Edited by client** on the dashboard, and email the team through Resend. The confirmation screen also includes a private edit link.
 
 Acuity is on the Standard plan, so the app does not call the Acuity API. The brief link opens the existing form with name, email, and shoot date filled in when those are known. Scheduling links are shown only to that signed-in client and to staff in the dashboard. They are not written to logs.
 

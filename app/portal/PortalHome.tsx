@@ -106,7 +106,8 @@ export default function PortalHome({ view, briefs }: { view: PortalView; briefs:
             <h2 id="briefs-heading">Your briefs</h2>
             {briefs.length === 0 ? (
               <div className="portal-empty">
-                <p>No briefs yet.</p>
+                <p>No briefs from the last two months.</p>
+                <p>When you send a new one, it will show up here.</p>
                 <a className="portal-text-link" href={view.briefHref}>Fill out your brief</a>
               </div>
             ) : (

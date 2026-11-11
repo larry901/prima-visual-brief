@@ -1,4 +1,4 @@
-import { chicagoDate, chicagoWallTimeToUtc, isIsoDate } from './portal/cycle'
+import { addMonths, chicagoDate, chicagoToday, chicagoWallTimeToUtc, isIsoDate } from './portal/cycle'
 
 export interface BriefOwner {
   id: number
@@ -73,6 +73,37 @@ export function changedBriefFields(
   after: Record<string, unknown>,
 ): string[] {
   return COMPARED_FIELDS.filter(([key]) => stable(before[key]) !== stable(after[key])).map(([, label]) => label)
+}
+
+/** Calendar day used for the portal list: shoot date, or the Chicago day it was submitted. */
+export function briefPortalDate(shootDate?: string | null, submittedAt?: string | null): string | null {
+  const shoot = (shootDate || '').trim().slice(0, 10)
+  if (isIsoDate(shoot)) return shoot
+  if (!submittedAt) return null
+  const parsed = new Date(submittedAt)
+  if (Number.isNaN(parsed.getTime())) return null
+  return chicagoDate(parsed)
+}
+
+/** Two calendar months before today in America/Chicago, same day-of-month when it exists. */
+export function briefPortalCutoff(now: Date = new Date()): string {
+  const today = chicagoToday(now)
+  return addMonths(today, -2, Number(today.slice(8, 10)))
+}
+
+/**
+ * Portal list only. Upcoming shoots always stay. Older rows stay in the database
+ * and on the admin dashboard; this only decides the client list.
+ */
+export function briefShownInPortal(
+  brief: { shoot_date?: string | null; submitted_at?: string | null },
+  now: Date = new Date(),
+): boolean {
+  const day = briefPortalDate(brief.shoot_date, brief.submitted_at)
+  if (!day) return false
+  const today = chicagoToday(now)
+  if (day >= today) return true
+  return day >= briefPortalCutoff(now)
 }
 
 function stable(value: unknown): string {
