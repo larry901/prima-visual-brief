@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { ClientKind, PlanSize } from '@/lib/portal/types'
 
@@ -21,6 +21,7 @@ export interface RosterClient {
   used: number
   renewalLabel: string
   appointments: { id: number; type: string; label: string; status: string }[]
+  portalUrl: string | null
 }
 
 export interface ReviewItem {
@@ -193,6 +194,7 @@ export default function RosterManager({
                     </button>
                   </div>
                 </div>
+                <PersonalLinkControls clientId={client.id} url={client.portalUrl} active={client.active} />
                 {client.appointments.length > 0 && (
                   <ul className="mt-4 space-y-1 text-sm text-brand-muted">
                     {client.appointments.map((appointment) => (
@@ -276,6 +278,127 @@ export default function RosterManager({
           Save types
         </button>
       </section>
+    </div>
+  )
+}
+
+function PersonalLinkControls({
+  clientId,
+  url: initialUrl,
+  active,
+}: {
+  clientId: number
+  url: string | null
+  active: boolean
+}) {
+  const router = useRouter()
+  const [url, setUrl] = useState(initialUrl)
+  const [seenUrl, setSeenUrl] = useState(initialUrl)
+  const [copied, setCopied] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
+
+  if (initialUrl !== seenUrl) {
+    setSeenUrl(initialUrl)
+    setUrl(initialUrl)
+  }
+
+  useEffect(() => {
+    if (!copied) return
+    const id = window.setTimeout(() => setCopied(false), 2000)
+    return () => window.clearTimeout(id)
+  }, [copied])
+
+  const copy = async () => {
+    if (!url) return
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      setNotice(null)
+    } catch {
+      setCopied(false)
+      setNotice('Select the link and copy it.')
+    }
+  }
+
+  const reset = async () => {
+    setSaving(true)
+    setNotice(null)
+    try {
+      const response = await fetch(`/api/dashboard/clients/${clientId}/link`, { method: 'POST' })
+      const data = await response.json().catch(() => null)
+      const nextUrl = data && typeof data.url === 'string' ? data.url : null
+      if (!response.ok || !nextUrl) {
+        const message = data && typeof data.error === 'string' ? data.error : 'Could not reset the link.'
+        setNotice(message)
+        return
+      }
+      setUrl(nextUrl)
+      setCopied(false)
+      setConfirming(false)
+      setNotice('New link ready. The old one no longer works.')
+      router.refresh()
+    } catch {
+      setNotice('Could not reset the link.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="mt-4 border-t border-brand-border pt-4">
+      <p className="text-sm font-medium" id={`personal-link-label-${clientId}`}>Personal link</p>
+      <p className="mt-1 text-xs text-brand-muted">
+        Send this when a video is ready. The client enters the primary email, or an additional email, to open the portal.
+      </p>
+      {url ? (
+        <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+          <input
+            id={`personal-link-${clientId}`}
+            aria-labelledby={`personal-link-label-${clientId}`}
+            className="input font-mono text-xs"
+            readOnly
+            spellCheck={false}
+            autoComplete="off"
+            value={url}
+            onFocus={(event) => event.currentTarget.select()}
+          />
+          <button type="button" className="btn-secondary shrink-0 px-3 py-2" onClick={() => { void copy() }}>
+            {copied ? 'Copied' : 'Copy link'}
+          </button>
+        </div>
+      ) : (
+        <p className="mt-2 text-sm text-brand-muted">
+          This link can&apos;t be shown. Reset it to make a new one. Resetting turns off the current link.
+        </p>
+      )}
+      <div className="mt-2 flex flex-wrap items-center gap-3">
+        {confirming ? (
+          <>
+            <span className="text-sm text-brand-muted">The current link stops working immediately.</span>
+            <button type="button" className="btn-secondary px-3 py-2" disabled={saving} onClick={() => { void reset() }}>
+              {saving ? 'Resetting…' : 'Confirm reset'}
+            </button>
+            <button
+              type="button"
+              className="text-sm text-brand-dark underline"
+              disabled={saving}
+              onClick={() => setConfirming(false)}
+            >
+              Cancel
+            </button>
+          </>
+        ) : (
+          <button type="button" className="btn-secondary px-3 py-2" onClick={() => setConfirming(true)}>
+            Reset link
+          </button>
+        )}
+      </div>
+      {!active && (
+        <p className="mt-2 text-xs text-brand-muted">Inactive — this link won&apos;t sign anyone in until the client is active again.</p>
+      )}
+      {notice && <p className="mt-2 text-sm text-brand-muted" role="status">{notice}</p>}
     </div>
   )
 }
