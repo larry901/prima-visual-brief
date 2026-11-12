@@ -151,7 +151,7 @@ export default function RosterManager({
   return (
     <div className="space-y-10">
       {demoEnabled && (
-        <div className="card p-4 text-sm border-[#B0892F]">
+        <div className="card p-4 text-sm border-[#435A57]">
           Demo seed is on. The example.com clients are fictional and refresh their sample shoots on each visit.
           Leave <span className="font-medium">PORTAL_DEMO_SEED</span> unset in production.
         </div>

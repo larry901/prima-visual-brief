@@ -31,8 +31,16 @@
   }
 }
 
-/* Client portal. Scoped so the brief form and dashboard keep their own type. */
+/* Client portal. Scoped so the brief form and dashboard keep their own type.
+   Accent lives on these variables: change --portal-accent, --portal-accent-rgb,
+   --portal-accent-text, and --portal-on-accent together. #000 on #435A57 is
+   2.84:1, so fills use white text. Small accent text on black uses #839290 (~6.5:1). */
 .portal {
+  --portal-accent: #435A57;
+  --portal-accent-rgb: 67, 90, 87;
+  --portal-accent-text: #839290;
+  --portal-on-accent: #ffffff;
+  --portal-watch-border: rgba(255, 255, 255, 0.55);
   min-height: 100vh;
   background: #000000;
   color: #ffffff;
@@ -68,7 +76,7 @@
   font-size: 12px;
 }
 .portal-kicker {
-  color: #B0892F;
+  color: var(--portal-accent-text);
   font-family: Montserrat, Inter, sans-serif;
   font-weight: 700;
   font-size: 11px;
@@ -92,7 +100,7 @@
   color: #d4d4d4;
   line-height: 1.5;
 }
-.portal-company { margin-top: 8px; color: #B0892F; }
+.portal-company { margin-top: 8px; color: var(--portal-accent-text); }
 .portal-muted { color: #a3a3a3; font-size: 0.875rem; margin-top: 10px; }
 .portal-stack { display: grid; gap: 12px; margin-top: 28px; }
 .portal-label { font-size: 0.875rem; }
@@ -106,8 +114,8 @@
   border-radius: 0;
 }
 .portal-input:focus {
-  outline: 2px solid #B0892F;
-  border-color: #B0892F;
+  outline: 2px solid var(--portal-accent-text);
+  border-color: var(--portal-accent-text);
 }
 .portal-btn {
   display: flex;
@@ -115,8 +123,8 @@
   justify-content: center;
   width: 100%;
   box-sizing: border-box;
-  background: #B0892F;
-  color: #000000;
+  background: var(--portal-accent);
+  color: var(--portal-on-accent);
   font-family: Montserrat, Inter, sans-serif;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -137,7 +145,7 @@
   font-size: 0.875rem;
   text-decoration: underline;
   text-underline-offset: 4px;
-  text-decoration-color: #B0892F;
+  text-decoration-color: var(--portal-accent-text);
   cursor: pointer;
   padding: 12px 0;
 }
@@ -149,7 +157,7 @@
   gap: 4px;
   margin-top: 24px;
   padding: 16px;
-  border: 1px solid #B0892F;
+  border: 1px solid var(--portal-accent);
   color: #ffffff;
   text-decoration: none;
 }
@@ -161,7 +169,7 @@
   margin-top: 28px;
 }
 .portal-stats article {
-  border-top: 1px solid #B0892F;
+  border-top: 1px solid var(--portal-accent);
   padding-top: 12px;
 }
 .portal-stat {
@@ -177,7 +185,7 @@
 .portal-renewal span { display: block; color: #a3a3a3; font-size: 0.8rem; margin-top: 4px; }
 .portal-block { margin-top: 36px; }
 .portal-shoot-type {
-  color: #B0892F;
+  color: var(--portal-accent-text);
   font-family: Montserrat, Inter, sans-serif;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -196,7 +204,7 @@
 }
 .portal-countdown span { white-space: nowrap; }
 .portal-countdown small {
-  color: #B0892F;
+  color: var(--portal-accent-text);
   font-size: 0.7rem;
   margin-left: 3px;
 }
@@ -208,12 +216,12 @@
   justify-content: space-between;
   gap: 12px;
   align-items: center;
-  border-top: 1px solid rgba(176, 137, 47, 0.4);
+  border-top: 1px solid rgba(var(--portal-accent-rgb), 0.4);
   padding-top: 12px;
   color: #ffffff;
   text-decoration: none;
 }
-.portal-list a { color: #B0892F; font-weight: 600; }
+.portal-list a { color: var(--portal-accent-text); font-weight: 600; }
 .portal-films { margin-top: 44px; }
 .portal-films-intro { color: #d4d4d4; margin: 0 0 14px; }
 .portal-film-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
@@ -223,7 +231,7 @@
   gap: 14px;
   min-height: 92px;
   padding: 16px;
-  border: 1px solid #B0892F;
+  border: 1px solid var(--portal-accent);
   border-radius: 14px;
   background: #111111;
   color: #ffffff;
@@ -239,8 +247,8 @@
   height: 52px;
   display: grid;
   place-items: center;
-  color: #B0892F;
-  border: 1px solid #B0892F;
+  color: var(--portal-accent-text);
+  border: 1px solid var(--portal-accent);
   border-radius: 10px;
 }
 .portal-film-copy { display: grid; gap: 4px; min-width: 0; }
@@ -261,8 +269,8 @@
 .portal-film-watch {
   margin-left: auto;
   flex-shrink: 0;
-  background: #B0892F;
-  color: #000000;
+  background: var(--portal-accent);
+  color: var(--portal-on-accent);
   font-family: Montserrat, Inter, sans-serif;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -275,18 +283,19 @@
   border-radius: 10px;
 }
 .portal-film-solo {
-  background: #B0892F;
-  color: #000000;
+  background: var(--portal-accent);
+  color: var(--portal-on-accent);
   min-height: 108px;
-  border-color: #B0892F;
+  border-color: var(--portal-accent);
 }
 .portal-film-solo .portal-film-play {
-  color: #000000;
-  border-color: #000000;
+  color: var(--portal-on-accent);
+  border-color: var(--portal-on-accent);
 }
 .portal-film-solo .portal-film-watch {
   background: #000000;
   color: #ffffff;
+  border: 1px solid var(--portal-watch-border);
 }
 .portal-film-soon {
   background: #111111;
@@ -300,7 +309,7 @@
 }
 .portal-brief-list { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 12px; }
 .portal-brief-card {
-  border: 1px solid rgba(176, 137, 47, 0.55);
+  border: 1px solid rgba(var(--portal-accent-rgb), 0.55);
   border-radius: 14px;
   padding: 16px;
   display: grid;
@@ -314,11 +323,11 @@
   color: #ffffff;
   text-decoration: underline;
   text-underline-offset: 4px;
-  text-decoration-color: #B0892F;
+  text-decoration-color: var(--portal-accent-text);
 }
 .portal-brief-edit {
-  background: #B0892F;
-  color: #000000 !important;
+  background: var(--portal-accent);
+  color: var(--portal-on-accent) !important;
   text-decoration: none !important;
   font-family: Montserrat, Inter, sans-serif;
   font-weight: 700;
@@ -332,7 +341,7 @@
   width: 100%;
   min-height: 70vh;
   height: 820px;
-  border: 1px solid rgba(176, 137, 47, 0.45);
+  border: 1px solid rgba(var(--portal-accent-rgb), 0.45);
   background: #ffffff;
   margin-top: 8px;
 }
