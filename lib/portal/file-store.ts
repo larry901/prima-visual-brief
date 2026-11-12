@@ -71,6 +71,18 @@ export function createFileStore(filePath: string): PortalStore {
       run((store) => store.createSession(clientId, tokenHash, expiresAt)),
     getClientBySession: (tokenHash, nowIso) => run((store) => store.getClientBySession(tokenHash, nowIso)),
     deleteSession: (tokenHash) => run((store) => store.deleteSession(tokenHash)),
+    getPersonalLink: (clientId) => run((store) => store.getPersonalLink(clientId)),
+    listPersonalLinks: () => run((store) => store.listPersonalLinks()),
+    findClientByPersonalLink: (tokenHash) => run((store) => store.findClientByPersonalLink(tokenHash)),
+    insertPersonalLink: (clientId, tokenHash, tokenCipher) =>
+      run((store) => store.insertPersonalLink(clientId, tokenHash, tokenCipher)),
+    replacePersonalLink: (clientId, tokenHash, tokenCipher) =>
+      run((store) => store.replacePersonalLink(clientId, tokenHash, tokenCipher)),
+    countPersonalLinkAttempts: (tokenHash, sinceIso) =>
+      run((store) => store.countPersonalLinkAttempts(tokenHash, sinceIso)),
+    recordPersonalLinkAttempt: (tokenHash, nowIso) =>
+      run((store) => store.recordPersonalLinkAttempt(tokenHash, nowIso)),
+    clearPersonalLinkAttempts: (tokenHash) => run((store) => store.clearPersonalLinkAttempts(tokenHash)),
     findBriefShootDates: (name, email) => run((store) => store.findBriefShootDates(name, email)),
     listAllBriefs: () => run((store) => store.listAllBriefs()),
     getBriefById: (id) => run((store) => store.getBriefById(id)),

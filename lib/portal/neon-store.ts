@@ -17,6 +17,7 @@ import {
 } from './clients'
 import { DEFAULT_COUNTED_TYPES } from './cycle'
 import { normalizeEmail } from './ingest'
+import { PERSONAL_LINK_DAY_WINDOW_MS } from './personal-link'
 import type {
   AppointmentPatch,
   AppointmentRecord,
@@ -25,6 +26,7 @@ import type {
   ClientKind,
   ClientRecord,
   NewAppointment,
+  PersonalLinkRow,
   PortalStore,
 } from './types'
 
@@ -117,6 +119,20 @@ interface AppointmentRow {
   raw_subject: string | null
   needs_review: boolean
   review_reason: string | null
+}
+
+interface PersonalLinkSqlRow {
+  client_id: number
+  token_hash: string
+  token_cipher: string
+}
+
+function mapPersonalLink(row: PersonalLinkSqlRow): PersonalLinkRow {
+  return {
+    clientId: Number(row.client_id),
+    tokenHash: String(row.token_hash),
+    tokenCipher: String(row.token_cipher),
+  }
 }
 
 function mapClient(row: ClientRow, additionalEmails: string[] = []): ClientRecord {
@@ -329,6 +345,29 @@ export function createNeonStore(): PortalStore {
         END IF;
       END
       $trg$
+    `
+    // Raw portal tokens are never stored. token_hash is SHA-256. token_cipher is
+    // AES-256-GCM under a key derived from DASHBOARD_PASSWORD so staff can show the link.
+    // Created on the first portal, roster, or ingest request, same as the tables above.
+    await sql`
+      CREATE TABLE IF NOT EXISTS client_portal_links (
+        client_id INTEGER PRIMARY KEY REFERENCES clients(id) ON DELETE CASCADE,
+        token_hash TEXT NOT NULL UNIQUE,
+        token_cipher TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `
+    await sql`
+      CREATE TABLE IF NOT EXISTS portal_link_attempts (
+        id SERIAL PRIMARY KEY,
+        token_hash TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `
+    await sql`
+      CREATE INDEX IF NOT EXISTS portal_link_attempts_token_created_idx
+      ON portal_link_attempts (token_hash, created_at)
     `
   }
 
@@ -734,6 +773,94 @@ export function createNeonStore(): PortalStore {
       await ensureReady()
       const sql = sqlClient()
       await sql`DELETE FROM portal_sessions WHERE token_hash = ${tokenHash}`
+    },
+
+    async getPersonalLink(clientId) {
+      await ensureReady()
+      const sql = sqlClient()
+      const rows = await sql`
+        SELECT client_id, token_hash, token_cipher
+        FROM client_portal_links
+        WHERE client_id = ${clientId}
+        LIMIT 1
+      `
+      return rows[0] ? mapPersonalLink(rows[0] as PersonalLinkSqlRow) : null
+    },
+
+    async listPersonalLinks() {
+      await ensureReady()
+      const sql = sqlClient()
+      const rows = await sql`
+        SELECT client_id, token_hash, token_cipher FROM client_portal_links
+      `
+      return (rows as PersonalLinkSqlRow[]).map(mapPersonalLink)
+    },
+
+    async findClientByPersonalLink(tokenHash) {
+      await ensureReady()
+      const sql = sqlClient()
+      const rows = await sql`
+        SELECT client_id FROM client_portal_links WHERE token_hash = ${tokenHash} LIMIT 1
+      `
+      const clientId = (rows[0] as { client_id: number } | undefined)?.client_id
+      if (!clientId) return null
+      return clientById(Number(clientId))
+    },
+
+    async insertPersonalLink(clientId, tokenHash, tokenCipher) {
+      await ensureReady()
+      const sql = sqlClient()
+      const rows = await sql`
+        INSERT INTO client_portal_links (client_id, token_hash, token_cipher)
+        VALUES (${clientId}, ${tokenHash}, ${tokenCipher})
+        ON CONFLICT (client_id) DO NOTHING
+        RETURNING client_id
+      `
+      return rows.length > 0
+    },
+
+    async replacePersonalLink(clientId, tokenHash, tokenCipher) {
+      await ensureReady()
+      const sql = sqlClient()
+      await sql`
+        INSERT INTO client_portal_links (client_id, token_hash, token_cipher)
+        VALUES (${clientId}, ${tokenHash}, ${tokenCipher})
+        ON CONFLICT (client_id) DO UPDATE SET
+          token_hash = EXCLUDED.token_hash,
+          token_cipher = EXCLUDED.token_cipher,
+          updated_at = NOW()
+      `
+    },
+
+    async countPersonalLinkAttempts(tokenHash, sinceIso) {
+      await ensureReady()
+      const sql = sqlClient()
+      const rows = await sql`
+        SELECT COUNT(*) AS count FROM portal_link_attempts
+        WHERE token_hash = ${tokenHash}
+          AND created_at >= CAST(${sinceIso} AS timestamptz)
+      `
+      return Number((rows[0] as { count: string | number }).count)
+    },
+
+    async recordPersonalLinkAttempt(tokenHash, nowIso) {
+      await ensureReady()
+      const sql = sqlClient()
+      const cutoff = new Date(new Date(nowIso).getTime() - PERSONAL_LINK_DAY_WINDOW_MS).toISOString()
+      await sql`
+        DELETE FROM portal_link_attempts
+        WHERE created_at < CAST(${cutoff} AS timestamptz)
+      `
+      await sql`
+        INSERT INTO portal_link_attempts (token_hash, created_at)
+        VALUES (${tokenHash}, CAST(${nowIso} AS timestamptz))
+      `
+    },
+
+    async clearPersonalLinkAttempts(tokenHash) {
+      await ensureReady()
+      const sql = sqlClient()
+      await sql`DELETE FROM portal_link_attempts WHERE token_hash = ${tokenHash}`
     },
 
     async listAllBriefs() {

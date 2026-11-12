@@ -1,14 +1,22 @@
+import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import DashboardNav from '@/app/dashboard/DashboardNav'
 import { isAuthenticated } from '@/lib/auth'
 import LogoutButton from '@/app/dashboard/LogoutButton'
 import { formatShootInstant } from '@/lib/portal/cycle'
+import { originFromHeaders } from '@/lib/portal/origin'
+import { personalLinkUrl, personalLinksForClients } from '@/lib/portal/personal-link'
 import { demoSeedEnabled, ensureDemoSeed } from '@/lib/portal/seed'
 import { getPortalStore } from '@/lib/portal/store'
 import { loadPortalView } from '@/lib/portal/view'
 import RosterManager, { type ReviewItem, type RosterClient } from './RosterManager'
 
 export const dynamic = 'force-dynamic'
+
+function portalLinkFor(origin: string, token: string | null | undefined): string | null {
+  if (!token) return null
+  return personalLinkUrl(origin, token)
+}
 
 export default async function ClientsPage() {
   if (!(await isAuthenticated())) redirect('/dashboard')
@@ -23,8 +31,16 @@ export default async function ClientsPage() {
     await store.ensureReady()
     await ensureDemoSeed(store)
     const roster = await store.listClients()
-    countedTypes = await store.getCountedTypes()
-    const reviewRows = await store.listNeedsReview()
+    const [types, reviewRows, portalTokens] = await Promise.all([
+      store.getCountedTypes(),
+      store.listNeedsReview(),
+      personalLinksForClients(store, roster.map((client) => client.id)).catch(() => {
+        console.error('Personal links could not be loaded')
+        return new Map<number, string | null>()
+      }),
+    ])
+    countedTypes = types
+    const origin = originFromHeaders(headers())
     reviews = reviewRows.map((row) => ({
       id: row.id,
       clientName: row.clientName,
@@ -62,6 +78,7 @@ export default async function ClientsPage() {
         used: view.used,
         renewalLabel: view.renewalLabel,
         appointments,
+        portalUrl: portalLinkFor(origin, portalTokens.get(client.id)),
       })
     }
   } catch (error) {
@@ -84,7 +101,7 @@ export default async function ClientsPage() {
         <div className="mb-8">
           <h1 className="font-display text-3xl font-semibold">Clients</h1>
           <p className="text-brand-muted text-sm mt-2">
-            Subscription clients have a plan, a renewal date, and a private scheduling link. Per-project clients use the shared scheduler. Extra emails on a client can sign in, and their bookings count on that client.
+            Subscription clients have a plan, a renewal date, and a private scheduling link. Per-project clients use the shared scheduler. Extra emails on a client can sign in, and their bookings count on that client. Each client also has a personal link you can send when a video is ready.
           </p>
         </div>
         {loadError ? (

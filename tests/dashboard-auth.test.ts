@@ -211,6 +211,8 @@ describe('staff dashboard auth', { concurrency: 1 }, () => {
         { cookie: 'authenticated', url: 'http://localhost/api/dashboard/briefs', status: 401 },
         { cookie: tamperSignature(signed(PASSWORD, Math.floor(Date.now() / 1000))), url: 'http://localhost/dashboard/clients', status: 307 },
         { cookie: expired, url: 'http://localhost/api/dashboard/clients', status: 401 },
+        { cookie: 'authenticated', url: 'http://localhost/api/dashboard/clients/1/link', status: 401 },
+        { cookie: 'authenticated', url: 'http://localhost/dashboard/clients', status: 307 },
       ]
 
       for (const item of cases) {
@@ -225,6 +227,11 @@ describe('staff dashboard auth', { concurrency: 1 }, () => {
           assert.equal(new URL(response.headers.get('location') ?? '').pathname, '/dashboard')
         }
       }
+
+      const missing = await middleware(
+        new NextRequest('http://localhost/api/dashboard/clients/1/link', { method: 'POST' }),
+      )
+      assert.equal(missing.status, 401)
     })
 
     it('allows a valid session and leaves login and logout public', async () => {
@@ -238,6 +245,21 @@ describe('staff dashboard auth', { concurrency: 1 }, () => {
       assert.equal(allowed.status, 200)
       assert.equal(allowed.headers.get('location'), null)
       assert.equal(allowed.headers.get('x-middleware-next'), '1')
+
+      const clientsPage = await middleware(
+        new NextRequest('http://localhost/dashboard/clients', {
+          headers: { cookie: `${SESSION_COOKIE}=${token}` },
+        }),
+      )
+      assert.equal(clientsPage.headers.get('x-middleware-next'), '1')
+
+      const resetLink = await middleware(
+        new NextRequest('http://localhost/api/dashboard/clients/1/link', {
+          method: 'POST',
+          headers: { cookie: `${SESSION_COOKIE}=${token}` },
+        }),
+      )
+      assert.equal(resetLink.headers.get('x-middleware-next'), '1')
 
       const loginResponse = await middleware(new NextRequest('http://localhost/api/dashboard/login', { method: 'POST' }))
       assert.equal(loginResponse.headers.get('x-middleware-next'), '1')

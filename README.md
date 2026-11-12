@@ -43,7 +43,7 @@ cp .env.local.example .env.local
 | `SPOTIFY_CLIENT_SECRET` | Yes | Spotify Developer App client secret |
 | `SPOTIFY_PLAYLIST_ID` | Yes | ID of the public Spotify playlist that powers "Reference songs" on the brief form. Grab it from the playlist URL: `open.spotify.com/playlist/<THIS_PART>?si=...` |
 | `EMAIL_API_KEY` | Yes | Resend API key (from resend.com). Also sends client-portal magic links. |
-| `DASHBOARD_PASSWORD` | Yes | Password for `/dashboard`. The session cookie is signed with a key derived from this value, so changing it signs everyone out. |
+| `DASHBOARD_PASSWORD` | Yes | Password for `/dashboard`. The session cookie is signed with a key derived from this value, so changing it signs everyone out. The same value encrypts each client's personal portal link. After a change, the Clients page can't show an existing link until you reset it. A link a client already saved keeps working until that reset. |
 | `APP_URL` | No | Public origin used in magic-link emails. Production: `https://brief.primavisual.io`. When unset, the link uses the request host, which is what you want on preview URLs. |
 | `ACUITY_INGEST_TOKEN` | For ingest | Bearer token for `POST /api/ingest/acuity`. The route returns 401 until this is set. |
 | `PORTAL_DEMO_SEED` | No | Set to `true` locally or on a preview deployment to load fictional `@example.com` clients and to show their sign-in links on screen. Leave unset in production. |
@@ -144,7 +144,7 @@ Only appointment types in the dashboard list **Shoots that count** use up a shoo
 
 ### Storage
 
-The portal uses the Neon database the brief form already uses (`POSTGRES_URL`). New tables (`clients`, `client_emails`, `appointments`, `magic_links`, `portal_sessions`, `portal_settings`) are created on the first portal, roster, or ingest request. `client_emails` only stores addresses beyond the primary, so existing clients are unchanged. No second database and no paid plan.
+The portal uses the Neon database the brief form already uses (`POSTGRES_URL`). New tables (`clients`, `client_emails`, `appointments`, `magic_links`, `portal_sessions`, `portal_settings`, `client_portal_links`, `portal_link_attempts`) are created on the first portal, roster, or ingest request. `client_emails` only stores addresses beyond the primary, so existing clients are unchanged. No second database, no manual migration, and no paid plan.
 
 If this project does not have Neon yet:
 
@@ -158,6 +158,12 @@ Locally, with no `POSTGRES_URL`, the portal stores its demo data in `.data/porta
 ### Magic-link sign-in
 
 `POST /api/portal/login` with `{ "email": "..." }` emails a one-time link when that address is the primary email or an additional email on an active client. The link opens that client's portal. Unknown addresses get the same response, so the roster is not listed. Links expire in 20 minutes. The session cookie lasts 14 days. Set `APP_URL` in production so the link host is `https://brief.primavisual.io`.
+
+### Personal client links
+
+Each client has one stable link, shaped like `/portal/c/<token>`. On **Clients**, copy it and send it when a video is ready. The client opens the link, enters an email on that account (the primary or an additional email), and gets the same 14-day portal session as a magic link. A wrong email gets a generic error that does not list the valid addresses. Five wrong tries in 15 minutes, or 20 in a day, pause further tries on that link. An inactive client's link does not sign anyone in. **Reset link** asks you to confirm, then the old link stops working immediately.
+
+The token is 32 random bytes. It is not derived from the client id or email. The database stores a SHA-256 hash for lookup and an encrypted copy of the token so staff can show the link. A copy of the row is not a usable URL without the dashboard password. New clients get a link when they are added. Clients who were already on the roster get one the next time someone opens **Clients**. Nothing here sends email. The sign-in form at `/portal` is unchanged.
 
 ### Ingesting Acuity notification emails
 
@@ -225,7 +231,7 @@ Do not enable `PORTAL_DEMO_SEED` on production. Redeploy after saving the variab
 ```
 app/
   brief/           — Public brief submission form
-  portal/          — Client portal (magic-link sign-in)
+  portal/          — Client portal (magic-link sign-in and personal links)
   dashboard/       — Staff dashboard (password protected), including Clients
   api/             — API routes
     submit-brief/  — Saves brief to DB + sends email

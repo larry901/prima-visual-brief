@@ -3,12 +3,14 @@ import { attachClientEmails, clientEmailAddresses, normalizeClientEmails, readFr
 import { DEFAULT_COUNTED_TYPES } from './cycle'
 import { clientOwnsBrief } from '../brief-logic'
 import { normalizeEmail } from './ingest'
+import { PERSONAL_LINK_DAY_WINDOW_MS } from './personal-link'
 import type {
   AppointmentPatch,
   AppointmentRecord,
   ClientInput,
   ClientRecord,
   NewAppointment,
+  PersonalLinkRow,
   PortalStore,
 } from './types'
 
@@ -27,11 +29,18 @@ interface SessionRow {
   expiresAt: string
 }
 
+interface PersonalAttemptRow {
+  tokenHash: string
+  createdAt: string
+}
+
 export interface MemoryData {
   clients: ClientRecord[]
   appointments: AppointmentRecord[]
   magicLinks: MagicLinkRow[]
   sessions: SessionRow[]
+  personalLinks: PersonalLinkRow[]
+  personalAttempts: PersonalAttemptRow[]
   countedTypes: string[]
   briefShootDates: { name: string; email: string; shootDate: string }[]
   briefs: BriefRow[]
@@ -44,6 +53,8 @@ export function emptyMemoryData(): MemoryData {
     appointments: [],
     magicLinks: [],
     sessions: [],
+    personalLinks: [],
+    personalAttempts: [],
     countedTypes: [...DEFAULT_COUNTED_TYPES],
     briefShootDates: [],
     briefs: [],
@@ -87,6 +98,8 @@ export class MemoryStore implements PortalStore {
     }
     if (!this.data.briefs) this.data.briefs = []
     if (!this.data.seq.brief) this.data.seq.brief = 1
+    if (!Array.isArray(this.data.personalLinks)) this.data.personalLinks = []
+    if (!Array.isArray(this.data.personalAttempts)) this.data.personalAttempts = []
   }
 
   async ensureReady(): Promise<void> {}
@@ -288,6 +301,58 @@ export class MemoryStore implements PortalStore {
 
   async deleteSession(tokenHash: string): Promise<void> {
     this.data.sessions = this.data.sessions.filter((session) => session.tokenHash !== tokenHash)
+  }
+
+  async getPersonalLink(clientId: number): Promise<PersonalLinkRow | null> {
+    return this.data.personalLinks.find((row) => row.clientId === clientId) ?? null
+  }
+
+  async listPersonalLinks(): Promise<PersonalLinkRow[]> {
+    return [...this.data.personalLinks]
+  }
+
+  async findClientByPersonalLink(tokenHash: string): Promise<ClientRecord | null> {
+    const row = this.data.personalLinks.find((link) => link.tokenHash === tokenHash)
+    if (!row) return null
+    return this.getClient(row.clientId)
+  }
+
+  async insertPersonalLink(clientId: number, tokenHash: string, tokenCipher: string): Promise<boolean> {
+    if (this.data.personalLinks.some((row) => row.clientId === clientId)) return false
+    if (this.data.personalLinks.some((row) => row.tokenHash === tokenHash)) {
+      throw new Error('Personal link already exists')
+    }
+    this.data.personalLinks.push({ clientId, tokenHash, tokenCipher })
+    return true
+  }
+
+  async replacePersonalLink(clientId: number, tokenHash: string, tokenCipher: string): Promise<void> {
+    if (this.data.personalLinks.some((row) => row.tokenHash === tokenHash && row.clientId !== clientId)) {
+      throw new Error('Personal link already exists')
+    }
+    this.data.personalLinks = this.data.personalLinks.filter((row) => row.clientId !== clientId)
+    this.data.personalLinks.push({ clientId, tokenHash, tokenCipher })
+  }
+
+  async countPersonalLinkAttempts(tokenHash: string, sinceIso: string): Promise<number> {
+    const since = new Date(sinceIso).getTime()
+    return this.data.personalAttempts.filter(
+      (row) => row.tokenHash === tokenHash && new Date(row.createdAt).getTime() >= since,
+    ).length
+  }
+
+  async recordPersonalLinkAttempt(tokenHash: string, nowIso: string): Promise<void> {
+    const now = new Date(nowIso).getTime()
+    if (Number.isNaN(now)) return
+    const cutoff = now - PERSONAL_LINK_DAY_WINDOW_MS
+    this.data.personalAttempts = this.data.personalAttempts.filter(
+      (row) => new Date(row.createdAt).getTime() >= cutoff,
+    )
+    this.data.personalAttempts.push({ tokenHash, createdAt: nowIso })
+  }
+
+  async clearPersonalLinkAttempts(tokenHash: string): Promise<void> {
+    this.data.personalAttempts = this.data.personalAttempts.filter((row) => row.tokenHash !== tokenHash)
   }
 
   async findBriefShootDates(name: string, email: string | string[]): Promise<string[]> {

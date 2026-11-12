@@ -36,6 +36,13 @@ export interface ClientInput {
   active: boolean
 }
 
+/** Lookup row for a client's stable portal link. The raw token is never stored. */
+export interface PersonalLinkRow {
+  clientId: number
+  tokenHash: string
+  tokenCipher: string
+}
+
 export interface AppointmentRecord {
   id: number
   clientId: number | null
@@ -109,6 +116,15 @@ export interface PortalStore extends IngestStore {
   createSession(clientId: number, tokenHash: string, expiresAt: string): Promise<void>
   getClientBySession(tokenHash: string, nowIso: string): Promise<ClientRecord | null>
   deleteSession(tokenHash: string): Promise<void>
+  getPersonalLink(clientId: number): Promise<PersonalLinkRow | null>
+  listPersonalLinks(): Promise<PersonalLinkRow[]>
+  findClientByPersonalLink(tokenHash: string): Promise<ClientRecord | null>
+  /** Insert only when this client has no link yet. False means one already exists. */
+  insertPersonalLink(clientId: number, tokenHash: string, tokenCipher: string): Promise<boolean>
+  replacePersonalLink(clientId: number, tokenHash: string, tokenCipher: string): Promise<void>
+  countPersonalLinkAttempts(tokenHash: string, sinceIso: string): Promise<number>
+  recordPersonalLinkAttempt(tokenHash: string, nowIso: string): Promise<void>
+  clearPersonalLinkAttempts(tokenHash: string): Promise<void>
   findBriefShootDates(name: string, email: string | string[]): Promise<string[]>
   listAllBriefs(): Promise<BriefRow[]>
   getBriefById(id: number): Promise<BriefRow | null>

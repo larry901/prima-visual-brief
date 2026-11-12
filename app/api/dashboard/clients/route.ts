@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { isAuthenticated } from '@/lib/auth'
 import { attachClientEmails, parseClientInput } from '@/lib/portal/clients'
+import { ensurePersonalLink } from '@/lib/portal/personal-link'
 import { getPortalStore } from '@/lib/portal/store'
 
 export const dynamic = 'force-dynamic'
@@ -14,6 +15,11 @@ export async function POST(request: Request) {
     await store.ensureReady()
     const client = await store.createClient(parsed.value)
     await attachClientEmails(store, client)
+    try {
+      await ensurePersonalLink(store, client.id)
+    } catch {
+      console.error('Could not create personal link')
+    }
     return NextResponse.json({ client })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Could not save client'

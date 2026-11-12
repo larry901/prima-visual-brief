@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requestOrigin } from '@/lib/portal/origin'
 import { setPortalCookie } from '@/lib/portal/session'
 import { getPortalStore } from '@/lib/portal/store'
-import { hashToken, newToken, sessionExpiry } from '@/lib/portal/tokens'
+import { hashToken, issuePortalSession } from '@/lib/portal/tokens'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,8 +15,7 @@ export async function GET(request: NextRequest) {
     await store.ensureReady()
     const client = await store.consumeMagicLink(hashToken(token), new Date().toISOString())
     if (!client) return NextResponse.redirect(`${origin}/portal?error=link`)
-    const session = newToken()
-    await store.createSession(client.id, hashToken(session), sessionExpiry())
+    const session = await issuePortalSession(store, client.id)
     const response = NextResponse.redirect(`${origin}/portal`)
     setPortalCookie(response, session)
     return response
