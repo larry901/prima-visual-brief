@@ -44,7 +44,7 @@ export default function PortalLogin({ error }: { error: string | null }) {
         <p className="portal-kicker">Client portal</p>
         <h1>Sign in</h1>
         <p className="portal-lede">
-          Use the email on your retainer. We&apos;ll send a one-time link. No password.
+          Use any email on your account. We&apos;ll send a one-time link. No password.
         </p>
         <form onSubmit={submit} className="portal-stack">
           <label className="portal-label" htmlFor="portal-email">Email</label>

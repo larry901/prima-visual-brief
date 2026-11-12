@@ -7,7 +7,14 @@ import {
   listBriefsForOwner,
   updateBriefRecord as saveBriefRecord,
 } from '../db'
-import { readFrameioUrl } from './clients'
+import {
+  attachClientEmails,
+  clientEmailAddresses,
+  emailList,
+  normalizeClientEmails,
+  readFrameioUrl,
+  readStoredPlanSize,
+} from './clients'
 import { DEFAULT_COUNTED_TYPES } from './cycle'
 import { normalizeEmail } from './ingest'
 import type {
@@ -18,7 +25,6 @@ import type {
   ClientKind,
   ClientRecord,
   NewAppointment,
-  PlanSize,
   PortalStore,
 } from './types'
 
@@ -46,11 +52,16 @@ function asBool(value: unknown): boolean {
   return value === true || value === 't' || value === 'true' || value === 1
 }
 
-function asPlan(value: unknown): PlanSize | null {
-  if (value == null || value === '') return null
-  const size = Number(value)
-  if (size === 2 || size === 4) return size
-  return null
+function asPlan(value: unknown) {
+  return readStoredPlanSize(value)
+}
+
+/**
+ * True when a Postgres CHECK definition already allows plan sizes 1, 2, and 4.
+ * `pg_get_constraintdef` prints `IN (1, 2, 4)` as `= ANY (ARRAY[1, 2, 4])`.
+ */
+export function planSizeConstraintAllowsOne(definition: string): boolean {
+  return /\b1\b/.test(definition) && /\b2\b/.test(definition) && /\b4\b/.test(definition)
 }
 
 function asKind(value: unknown): ClientKind {
@@ -108,11 +119,12 @@ interface AppointmentRow {
   review_reason: string | null
 }
 
-function mapClient(row: ClientRow): ClientRecord {
+function mapClient(row: ClientRow, additionalEmails: string[] = []): ClientRecord {
   return {
     id: Number(row.id),
     name: row.name,
     email: row.email,
+    additionalEmails,
     company: row.company ?? '',
     kind: asKind(row.client_kind),
     planSize: asPlan(row.plan_size),
@@ -146,6 +158,40 @@ function duplicateEmail(error: unknown): boolean {
   return /duplicate key|unique constraint/i.test(message) && /email/i.test(message)
 }
 
+async function ensurePlanSizeAllowsOne(sql: ReturnType<typeof sqlClient>): Promise<void> {
+  const rows = (await sql`
+    SELECT pg_get_constraintdef(oid) AS definition
+    FROM pg_constraint
+    WHERE conrelid = 'clients'::regclass
+      AND contype = 'c'
+      AND pg_get_constraintdef(oid) ILIKE '%plan_size%'
+  `) as { definition: string }[]
+  if (rows.length > 0 && rows.every((row) => planSizeConstraintAllowsOne(String(row.definition ?? '')))) {
+    return
+  }
+  await sql`
+    DO $plan$
+    DECLARE
+      constraint_name text;
+    BEGIN
+      FOR constraint_name IN
+        SELECT conname
+        FROM pg_constraint
+        WHERE conrelid = 'clients'::regclass
+          AND contype = 'c'
+          AND pg_get_constraintdef(oid) ILIKE '%plan_size%'
+      LOOP
+        EXECUTE format('ALTER TABLE clients DROP CONSTRAINT %I', constraint_name);
+      END LOOP;
+
+      ALTER TABLE clients
+        ADD CONSTRAINT clients_plan_size_check
+        CHECK (plan_size IS NULL OR plan_size IN (1, 2, 4));
+    END
+    $plan$;
+  `
+}
+
 export function createNeonStore(): PortalStore {
   let ready: Promise<void> | null = null
 
@@ -168,7 +214,7 @@ export function createNeonStore(): PortalStore {
         email TEXT NOT NULL UNIQUE,
         company TEXT NOT NULL DEFAULT '',
         client_kind TEXT NOT NULL DEFAULT 'subscription',
-        plan_size INTEGER CHECK (plan_size IS NULL OR plan_size IN (2, 4)),
+        plan_size INTEGER CHECK (plan_size IS NULL OR plan_size IN (1, 2, 4)),
         renewal_date DATE,
         billing_anchor_day INTEGER CHECK (billing_anchor_day IS NULL OR billing_anchor_day BETWEEN 1 AND 31),
         scheduling_link TEXT,
@@ -234,12 +280,120 @@ export function createNeonStore(): PortalStore {
     await sql`ALTER TABLE clients ALTER COLUMN plan_size DROP NOT NULL`
     await sql`ALTER TABLE clients ALTER COLUMN renewal_date DROP NOT NULL`
     await sql`ALTER TABLE clients ALTER COLUMN billing_anchor_day DROP NOT NULL`
+    // CREATE TABLE IF NOT EXISTS does not change a check that already exists.
+    // Widen the original (2, 4) check so a 1-shoot plan can be saved.
+    await ensurePlanSizeAllowsOne(sql)
+    // Extra addresses live in a new table. Existing clients keep clients.email and need no rows.
+    await sql`
+      CREATE TABLE IF NOT EXISTS client_emails (
+        id SERIAL PRIMARY KEY,
+        client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+        email TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `
+    await sql`CREATE UNIQUE INDEX IF NOT EXISTS client_emails_email_lower_idx ON client_emails (lower(email))`
+    await sql`CREATE INDEX IF NOT EXISTS client_emails_client_id_idx ON client_emails (client_id)`
+    await sql`
+      CREATE OR REPLACE FUNCTION reject_overlapping_client_email() RETURNS trigger AS $fn$
+      BEGIN
+        IF TG_TABLE_NAME = 'client_emails' THEN
+          IF EXISTS (SELECT 1 FROM clients WHERE lower(email) = lower(NEW.email)) THEN
+            RAISE EXCEPTION 'duplicate key value violates unique constraint "email"';
+          END IF;
+        ELSIF TG_TABLE_NAME = 'clients' THEN
+          IF EXISTS (
+            SELECT 1 FROM client_emails
+            WHERE lower(email) = lower(NEW.email)
+              AND client_id IS DISTINCT FROM NEW.id
+          ) THEN
+            RAISE EXCEPTION 'duplicate key value violates unique constraint "email"';
+          END IF;
+        END IF;
+        RETURN NEW;
+      END;
+      $fn$ LANGUAGE plpgsql
+    `
+    await sql`
+      DO $trg$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'client_emails_reject_overlap') THEN
+          CREATE TRIGGER client_emails_reject_overlap
+          BEFORE INSERT OR UPDATE OF email ON client_emails
+          FOR EACH ROW EXECUTE FUNCTION reject_overlapping_client_email();
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'clients_reject_email_overlap') THEN
+          CREATE TRIGGER clients_reject_email_overlap
+          BEFORE INSERT OR UPDATE OF email ON clients
+          FOR EACH ROW EXECUTE FUNCTION reject_overlapping_client_email();
+        END IF;
+      END
+      $trg$
+    `
+  }
+
+  async function additionalEmailsFor(clientId: number): Promise<string[]> {
+    const sql = sqlClient()
+    const rows = await sql`
+      SELECT email FROM client_emails WHERE client_id = ${clientId} ORDER BY id ASC
+    `
+    return (rows as { email: string }[]).map((row) => row.email)
+  }
+
+  async function hydrate(row: ClientRow): Promise<ClientRecord> {
+    return mapClient(row, await additionalEmailsFor(Number(row.id)))
   }
 
   async function clientById(id: number): Promise<ClientRecord | null> {
     const sql = sqlClient()
     const rows = await sql`SELECT * FROM clients WHERE id = ${id} LIMIT 1`
-    return rows[0] ? mapClient(rows[0] as ClientRow) : null
+    return rows[0] ? hydrate(rows[0] as ClientRow) : null
+  }
+
+  async function assertEmailsAvailable(emails: string[], exceptId: number | null) {
+    const sql = sqlClient()
+    for (const email of emails) {
+      const primary =
+        exceptId == null
+          ? await sql`SELECT id FROM clients WHERE lower(email) = ${email} LIMIT 1`
+          : await sql`SELECT id FROM clients WHERE lower(email) = ${email} AND id <> ${exceptId} LIMIT 1`
+      if (primary.length > 0) throw new Error('A client with that email already exists')
+      const extra =
+        exceptId == null
+          ? await sql`SELECT client_id FROM client_emails WHERE lower(email) = ${email} LIMIT 1`
+          : await sql`SELECT client_id FROM client_emails WHERE lower(email) = ${email} AND client_id <> ${exceptId} LIMIT 1`
+      if (extra.length > 0) throw new Error('A client with that email already exists')
+    }
+  }
+
+  async function attachUnmatchedEmail(email: string, clientId: number) {
+    const sql = sqlClient()
+    await sql`
+      UPDATE appointments SET
+        client_id = ${clientId},
+        needs_review = CASE WHEN review_reason = 'unmatched_client' THEN FALSE ELSE needs_review END,
+        review_reason = CASE WHEN review_reason = 'unmatched_client' THEN NULL ELSE review_reason END,
+        updated_at = NOW()
+      WHERE lower(client_email) = ${normalizeEmail(email)}
+        AND (client_id IS NULL OR client_id = ${clientId})
+    `
+  }
+
+  async function syncAdditionalEmails(clientId: number, emails: string[]) {
+    const sql = sqlClient()
+    const current = await sql`SELECT email FROM client_emails WHERE client_id = ${clientId}`
+    const have = new Set((current as { email: string }[]).map((row) => row.email.toLowerCase()))
+    const want = new Set(emails)
+    for (const email of Array.from(have)) {
+      if (!want.has(email)) {
+        await sql`DELETE FROM client_emails WHERE client_id = ${clientId} AND lower(email) = ${email}`
+      }
+    }
+    for (const email of emails) {
+      if (!have.has(email)) {
+        await sql`INSERT INTO client_emails (client_id, email) VALUES (${clientId}, ${email})`
+      }
+    }
   }
 
   return {
@@ -248,8 +402,19 @@ export function createNeonStore(): PortalStore {
     async listClients() {
       await ensureReady()
       const sql = sqlClient()
-      const rows = await sql`SELECT * FROM clients ORDER BY lower(name) ASC`
-      return (rows as ClientRow[]).map(mapClient)
+      const rows = (await sql`SELECT * FROM clients ORDER BY lower(name) ASC`) as ClientRow[]
+      const extras = (await sql`SELECT client_id, email FROM client_emails ORDER BY id ASC`) as {
+        client_id: number
+        email: string
+      }[]
+      const byId = new Map<number, string[]>()
+      for (const extra of extras) {
+        const id = Number(extra.client_id)
+        const list = byId.get(id) ?? []
+        list.push(extra.email)
+        byId.set(id, list)
+      }
+      return rows.map((row) => mapClient(row, byId.get(Number(row.id)) ?? []))
     },
 
     async getClient(id) {
@@ -260,13 +425,23 @@ export function createNeonStore(): PortalStore {
     async findClientByEmail(email) {
       await ensureReady()
       const sql = sqlClient()
-      const rows = await sql`SELECT * FROM clients WHERE email = ${normalizeEmail(email)} LIMIT 1`
-      return rows[0] ? mapClient(rows[0] as ClientRow) : null
+      const norm = normalizeEmail(email)
+      const primary = await sql`SELECT * FROM clients WHERE lower(email) = ${norm} LIMIT 1`
+      if (primary[0]) return hydrate(primary[0] as ClientRow)
+      const viaExtra = await sql`
+        SELECT c.* FROM clients c
+        INNER JOIN client_emails e ON e.client_id = c.id
+        WHERE lower(e.email) = ${norm}
+        LIMIT 1
+      `
+      return viaExtra[0] ? hydrate(viaExtra[0] as ClientRow) : null
     },
 
     async createClient(input: ClientInput) {
       await ensureReady()
       const sql = sqlClient()
+      const emails = normalizeClientEmails(input)
+      await assertEmailsAvailable(clientEmailAddresses(emails), null)
       const plan = storedPlan(input, null)
       try {
         const rows = await sql`
@@ -275,7 +450,7 @@ export function createNeonStore(): PortalStore {
             scheduling_link, frameio_url, frameio_links, active
           ) VALUES (
             ${input.name},
-            ${normalizeEmail(input.email)},
+            ${emails.email},
             ${input.company},
             ${input.kind},
             ${plan.planSize},
@@ -288,7 +463,10 @@ export function createNeonStore(): PortalStore {
           )
           RETURNING *
         `
-        return mapClient(rows[0] as ClientRow)
+        const created = mapClient(rows[0] as ClientRow, emails.additionalEmails)
+        await syncAdditionalEmails(created.id, emails.additionalEmails)
+        await attachClientEmails({ attachUnmatched: attachUnmatchedEmail }, created)
+        return created
       } catch (error) {
         if (duplicateEmail(error)) throw new Error('A client with that email already exists')
         throw error
@@ -300,12 +478,14 @@ export function createNeonStore(): PortalStore {
       const sql = sqlClient()
       const existing = await clientById(id)
       if (!existing) throw new Error('Client not found')
+      const emails = normalizeClientEmails(input)
+      await assertEmailsAvailable(clientEmailAddresses(emails), id)
       const plan = storedPlan(input, existing)
       try {
         const rows = await sql`
           UPDATE clients SET
             name = ${input.name},
-            email = ${normalizeEmail(input.email)},
+            email = ${emails.email},
             company = ${input.company},
             client_kind = ${input.kind},
             plan_size = ${plan.planSize},
@@ -320,7 +500,10 @@ export function createNeonStore(): PortalStore {
           RETURNING *
         `
         if (!rows[0]) throw new Error('Client not found')
-        return mapClient(rows[0] as ClientRow)
+        await syncAdditionalEmails(id, emails.additionalEmails)
+        const saved = mapClient(rows[0] as ClientRow, emails.additionalEmails)
+        await attachClientEmails({ attachUnmatched: attachUnmatchedEmail }, saved)
+        return saved
       } catch (error) {
         if (duplicateEmail(error)) throw new Error('A client with that email already exists')
         throw error
@@ -450,16 +633,7 @@ export function createNeonStore(): PortalStore {
 
     async attachUnmatched(email, clientId) {
       await ensureReady()
-      const sql = sqlClient()
-      await sql`
-        UPDATE appointments SET
-          client_id = ${clientId},
-          needs_review = CASE WHEN review_reason = 'unmatched_client' THEN FALSE ELSE needs_review END,
-          review_reason = CASE WHEN review_reason = 'unmatched_client' THEN NULL ELSE review_reason END,
-          updated_at = NOW()
-        WHERE lower(client_email) = ${normalizeEmail(email)}
-          AND (client_id IS NULL OR client_id = ${clientId})
-      `
+      await attachUnmatchedEmail(email, clientId)
     },
 
     async getCountedTypes() {
@@ -591,12 +765,15 @@ export function createNeonStore(): PortalStore {
     async findBriefShootDates(name, email) {
       await ensureReady()
       const sql = sqlClient()
+      const emails = emailList(email)
+      const nameKey = name.trim().toLowerCase()
       try {
         const rows = await sql`
           SELECT shoot_date FROM briefs
-          WHERE lower(agent_name) = ${name.trim().toLowerCase()}
-             OR lower(client_name) = ${normalizeEmail(email)}
-             OR lower(client_name) = ${name.trim().toLowerCase()}
+          WHERE lower(agent_name) = ${nameKey}
+             OR lower(client_name) = ${nameKey}
+             OR lower(client_name) = ANY(${emails})
+             OR lower(client_email) = ANY(${emails})
         `
         return (rows as { shoot_date: string }[]).map((row) => String(row.shoot_date).slice(0, 10))
       } catch {

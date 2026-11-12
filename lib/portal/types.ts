@@ -1,6 +1,6 @@
 import type { BriefRow, BriefUpdate, NewBriefRecord } from '../db'
 
-export type PlanSize = 2 | 4
+export type PlanSize = 1 | 2 | 4
 export type ClientKind = 'subscription' | 'project'
 export type AppointmentStatus = 'scheduled' | 'rescheduled' | 'cancelled'
 export type IngestEventName = 'new' | 'rescheduled' | 'cancelled'
@@ -8,7 +8,10 @@ export type IngestEventName = 'new' | 'rescheduled' | 'cancelled'
 export interface ClientRecord {
   id: number
   name: string
+  /** Primary address. Sign-in, ingest, and the scheduler prefill all accept this. */
   email: string
+  /** Other people on the same account. Same portal, same shoot count. */
+  additionalEmails: string[]
   company: string
   kind: ClientKind
   planSize: PlanSize | null
@@ -22,6 +25,8 @@ export interface ClientRecord {
 export interface ClientInput {
   name: string
   email: string
+  /** Omitted means none. Stored lowercase, never including the primary. */
+  additionalEmails?: string[]
   company: string
   kind: ClientKind
   planSize: PlanSize | null
@@ -104,10 +109,10 @@ export interface PortalStore extends IngestStore {
   createSession(clientId: number, tokenHash: string, expiresAt: string): Promise<void>
   getClientBySession(tokenHash: string, nowIso: string): Promise<ClientRecord | null>
   deleteSession(tokenHash: string): Promise<void>
-  findBriefShootDates(name: string, email: string): Promise<string[]>
+  findBriefShootDates(name: string, email: string | string[]): Promise<string[]>
   listAllBriefs(): Promise<BriefRow[]>
   getBriefById(id: number): Promise<BriefRow | null>
-  listBriefsForClient(clientId: number, email: string): Promise<BriefRow[]>
+  listBriefsForClient(clientId: number, email: string | string[]): Promise<BriefRow[]>
   getBriefByEditTokenHash(tokenHash: string): Promise<BriefRow | null>
   createBriefRecord(row: NewBriefRecord): Promise<BriefRow>
   updateBriefRecord(id: number, patch: BriefUpdate): Promise<BriefRow>

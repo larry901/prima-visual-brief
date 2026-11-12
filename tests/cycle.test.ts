@@ -119,6 +119,37 @@ describe('shoots remaining', () => {
     assert.equal(renewalMorning.used, 0)
   })
 
+  it('counts a 1-shoot plan down to zero and not below', () => {
+    const open = shootsRemaining({
+      planSize: 1,
+      ...cycle,
+      countedTypes: COUNTED,
+      appointments: [],
+    })
+    assert.deepEqual(open, { used: 0, remaining: 1 })
+
+    const booked = shootsRemaining({
+      planSize: 1,
+      ...cycle,
+      countedTypes: COUNTED,
+      appointments: [
+        { appointmentType: 'Listing Shoot', startAt: '2026-03-02T16:00:00.000Z', status: 'scheduled' },
+      ],
+    })
+    assert.deepEqual(booked, { used: 1, remaining: 0 })
+
+    const overbooked = shootsRemaining({
+      planSize: 1,
+      ...cycle,
+      countedTypes: COUNTED,
+      appointments: [
+        { appointmentType: 'Listing Shoot', startAt: '2026-03-02T16:00:00.000Z', status: 'scheduled' },
+        { appointmentType: 'Video Shoot', startAt: '2026-03-03T16:00:00.000Z', status: 'scheduled' },
+      ],
+    })
+    assert.deepEqual(overbooked, { used: 2, remaining: 0 })
+  })
+
   it('does not go below zero when a plan is overbooked', () => {
     const tally = shootsRemaining({
       planSize: 2,

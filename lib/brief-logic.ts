@@ -3,6 +3,8 @@ import { addMonths, chicagoDate, chicagoToday, chicagoWallTimeToUtc, isIsoDate }
 export interface BriefOwner {
   id: number
   email: string
+  /** Primary plus any additional addresses. Email alone still matches. */
+  emails?: string[]
 }
 
 export interface BriefAccessRow {
@@ -13,13 +15,17 @@ export interface BriefAccessRow {
   edit_token_hash?: string | null
 }
 
-/** A brief belongs to a client by their roster id or their email. Names alone never match. */
+/** A brief belongs to a client by their roster id or any of their emails. Names alone never match. */
 export function clientOwnsBrief(brief: BriefAccessRow, client: BriefOwner): boolean {
   if (brief.client_id != null && Number(brief.client_id) === client.id) return true
-  const email = client.email.trim().toLowerCase()
-  if (!email) return false
-  if ((brief.client_email || '').trim().toLowerCase() === email) return true
-  if ((brief.client_name || '').trim().toLowerCase() === email) return true
+  const emails = new Set(
+    [client.email, ...(client.emails ?? [])].map((email) => email.trim().toLowerCase()).filter(Boolean),
+  )
+  if (emails.size === 0) return false
+  const briefEmail = (brief.client_email || '').trim().toLowerCase()
+  const briefName = (brief.client_name || '').trim().toLowerCase()
+  if (briefEmail && emails.has(briefEmail)) return true
+  if (briefName && emails.has(briefName)) return true
   return false
 }
 

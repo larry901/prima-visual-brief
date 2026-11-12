@@ -19,6 +19,20 @@ describe('brief ownership', () => {
     assert.equal(clientOwnsBrief({ client_id: 1, client_email: 'other@example.com', agent_name: 'Maya Chen' }, maya), true)
     assert.equal(clientOwnsBrief({ client_id: null, client_email: 'Maya.Chen@example.com' }, maya), true)
     assert.equal(clientOwnsBrief({ client_id: null, client_name: 'maya.chen@example.com' }, maya), true)
+    assert.equal(
+      clientOwnsBrief(
+        { client_id: null, client_email: 'sam.example@example.com' },
+        { id: 1, email: 'maya.chen@example.com', emails: ['maya.chen@example.com', 'sam.example@example.com'] },
+      ),
+      true,
+    )
+    assert.equal(
+      clientOwnsBrief(
+        { client_id: null, client_email: 'sam.example@example.com' },
+        andre,
+      ),
+      false,
+    )
     assert.equal(clientOwnsBrief({ client_id: 2, client_email: 'andre.walsh@example.com', agent_name: 'Maya Chen' }, maya), false)
     assert.equal(canAccessBrief({ client_id: 2, edit_token_hash: 'hash' }, { client: maya, tokenHash: 'nope' }), false)
     assert.equal(canAccessBrief({ client_id: 2, edit_token_hash: 'hash' }, { client: andre, tokenHash: null }), true)

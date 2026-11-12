@@ -1,5 +1,5 @@
 import { addDays, chicagoToday, chicagoWallTimeToUtc } from './cycle'
-import type { PortalStore } from './types'
+import type { PlanSize, PortalStore } from './types'
 
 const DEMO_EMAILS = ['maya.chen@example.com', 'andre.walsh@example.com', 'priya.nair@example.com']
 
@@ -195,7 +195,7 @@ async function upsertClient(
     email: string
     company: string
     kind: 'subscription' | 'project'
-    planSize: 2 | 4 | null
+    planSize: PlanSize | null
     renewalDate: string | null
     schedulingLink: string | null
     active: boolean

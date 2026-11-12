@@ -53,6 +53,7 @@ export default async function ClientsPage() {
         id: client.id,
         name: client.name,
         email: client.email,
+        additionalEmails: client.additionalEmails,
         company: client.company,
         kind: client.kind,
         planSize: client.planSize,
@@ -87,7 +88,7 @@ export default async function ClientsPage() {
         <div className="mb-8">
           <h1 className="font-display text-3xl font-semibold">Clients</h1>
           <p className="text-brand-muted text-sm mt-2">
-            Subscription clients have a plan, a renewal date, and a private scheduling link. Per-project clients use the shared scheduler.
+            Subscription clients have a plan, a renewal date, and a private scheduling link. Per-project clients use the shared scheduler. Extra emails on a client can sign in, and their bookings count on that client.
           </p>
         </div>
         {loadError ? (

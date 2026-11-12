@@ -1,5 +1,6 @@
 import type { BriefRow } from './db'
 import { formatLongDate, isIsoDate } from './portal/cycle'
+import { clientEmailAddresses } from './portal/clients'
 import { changedBriefFields, briefEditClosesAt, briefIsEditable, briefShownInPortal, canAccessBrief, type BriefOwner } from './brief-logic'
 import type { PortalStore } from './portal/types'
 
@@ -49,9 +50,14 @@ export interface PortalBriefCard {
   editable: boolean
 }
 
-export async function portalBriefCards(store: PortalStore, client: BriefOwner, now = new Date()): Promise<PortalBriefCard[]> {
+export async function portalBriefCards(
+  store: PortalStore,
+  client: BriefOwner & { additionalEmails?: string[] | null },
+  now = new Date(),
+): Promise<PortalBriefCard[]> {
+  const emails = clientEmailAddresses(client)
   const [briefs, starts] = await Promise.all([
-    store.listBriefsForClient(client.id, client.email),
+    store.listBriefsForClient(client.id, emails),
     shootStartsForClient(store, client.id),
   ])
   return briefs.filter((brief) => briefShownInPortal(brief, now)).map((brief) => ({

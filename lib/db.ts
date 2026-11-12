@@ -280,15 +280,30 @@ export async function getBriefById(id: number): Promise<BriefRow | null> {
   return rows[0] ? mapBriefRow(rows[0] as Record<string, unknown>) : null
 }
 
-export async function listBriefsForOwner(clientId: number, email: string): Promise<BriefRow[]> {
+export async function listBriefsForOwner(clientId: number, email: string | string[]): Promise<BriefRow[]> {
   await ensureTable()
   const sql = getSql()
-  const normalized = email.trim().toLowerCase()
+  const emails = Array.from(new Set((Array.isArray(email) ? email : [email]).map((entry) => entry.trim().toLowerCase()).filter(Boolean)))
+  if (emails.length === 0) {
+    const rows = await sql`SELECT * FROM briefs WHERE client_id = ${clientId} ORDER BY submitted_at DESC`
+    return (rows as Record<string, unknown>[]).map(mapBriefRow)
+  }
+  if (emails.length === 1) {
+    const normalized = emails[0]
+    const rows = await sql`
+      SELECT * FROM briefs
+      WHERE client_id = ${clientId}
+         OR lower(client_email) = ${normalized}
+         OR lower(client_name) = ${normalized}
+      ORDER BY submitted_at DESC
+    `
+    return (rows as Record<string, unknown>[]).map(mapBriefRow)
+  }
   const rows = await sql`
     SELECT * FROM briefs
     WHERE client_id = ${clientId}
-       OR lower(client_email) = ${normalized}
-       OR lower(client_name) = ${normalized}
+       OR lower(client_email) = ANY(${emails})
+       OR lower(client_name) = ANY(${emails})
     ORDER BY submitted_at DESC
   `
   return (rows as Record<string, unknown>[]).map(mapBriefRow)
