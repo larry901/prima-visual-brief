@@ -1,15 +1,10 @@
-import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { isAuthenticated } from '@/lib/auth'
 import { ensureDemoSeed } from '@/lib/portal/seed'
 import { getPortalStore } from '@/lib/portal/store'
 import Link from 'next/link'
 import LogoutButton from '@/app/dashboard/LogoutButton'
 import DashboardNav from '@/app/dashboard/DashboardNav'
-
-function isAuthenticated() {
-  const cookieStore = cookies()
-  return cookieStore.get('prima_session')?.value === 'authenticated'
-}
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-US', {
@@ -20,7 +15,7 @@ function formatDate(dateStr: string) {
 }
 
 export default async function BriefsListPage() {
-  if (!isAuthenticated()) redirect('/dashboard')
+  if (!(await isAuthenticated())) redirect('/dashboard')
 
   const store = getPortalStore()
   await store.ensureReady()

@@ -5,7 +5,7 @@ import { getPortalStore } from '@/lib/portal/store'
 export const dynamic = 'force-dynamic'
 
 export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
-  if (!isAuthenticated()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!(await isAuthenticated())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const id = Number(params.id)
   if (!Number.isInteger(id)) return NextResponse.json({ error: 'Invalid review' }, { status: 400 })
   try {

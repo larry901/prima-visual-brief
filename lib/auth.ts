@@ -1,24 +1,32 @@
 import { cookies } from 'next/headers'
+import { NextResponse } from 'next/server'
+import {
+  SESSION_COOKIE,
+  SESSION_MAX_AGE_SECONDS,
+  createSessionToken,
+  sessionCookieOptions,
+  verifySessionToken,
+} from './dashboard-session'
 
-const SESSION_COOKIE = 'prima_session'
-const SESSION_VALUE = 'authenticated'
+export {
+  SESSION_COOKIE,
+  SESSION_MAX_AGE_SECONDS,
+  createSessionToken,
+  dashboardPasswordMatches,
+  sessionCookieOptions,
+  verifySessionToken,
+} from './dashboard-session'
 
-export function isAuthenticated(): boolean {
-  const cookieStore = cookies()
-  const session = cookieStore.get(SESSION_COOKIE)
-  return session?.value === SESSION_VALUE
+export async function isAuthenticated(): Promise<boolean> {
+  const token = cookies().get(SESSION_COOKIE)?.value
+  if (!token) return false
+  return verifySessionToken(token)
 }
 
-export function setAuthCookie(response: Response): void {
-  response.headers.append(
-    'Set-Cookie',
-    `${SESSION_COOKIE}=${SESSION_VALUE}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 7}`
-  )
+export async function setAuthCookie(response: NextResponse): Promise<void> {
+  response.cookies.set(SESSION_COOKIE, await createSessionToken(), sessionCookieOptions(SESSION_MAX_AGE_SECONDS))
 }
 
-export function clearAuthCookie(response: Response): void {
-  response.headers.append(
-    'Set-Cookie',
-    `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`
-  )
+export function clearAuthCookie(response: NextResponse): void {
+  response.cookies.set(SESSION_COOKIE, '', sessionCookieOptions(0))
 }

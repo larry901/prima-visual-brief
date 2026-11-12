@@ -6,7 +6,7 @@ import { getPortalStore } from '@/lib/portal/store'
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: Request) {
-  if (!isAuthenticated()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!(await isAuthenticated())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const parsed = parseClientInput(await request.json().catch(() => null))
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 })
   try {

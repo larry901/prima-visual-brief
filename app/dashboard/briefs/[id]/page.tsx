@@ -1,5 +1,5 @@
-import { cookies } from 'next/headers'
 import { redirect, notFound } from 'next/navigation'
+import { isAuthenticated } from '@/lib/auth'
 import { changedBriefFields } from '@/lib/brief-logic'
 import type { VideoDetail } from '@/lib/db'
 import { ensureDemoSeed } from '@/lib/portal/seed'
@@ -10,11 +10,6 @@ import TrackList from '@/app/dashboard/TrackList'
 import LogoutButton from '@/app/dashboard/LogoutButton'
 import DashboardNav from '@/app/dashboard/DashboardNav'
 import CopyForNotion from '@/app/dashboard/CopyForNotion'
-
-function isAuthenticated() {
-  const cookieStore = cookies()
-  return cookieStore.get('prima_session')?.value === 'authenticated'
-}
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-US', {
@@ -37,7 +32,7 @@ function isImagePath(p: string) {
 }
 
 export default async function BriefDetailPage({ params }: { params: { id: string } }) {
-  if (!isAuthenticated()) redirect('/dashboard')
+  if (!(await isAuthenticated())) redirect('/dashboard')
 
   const store = getPortalStore()
   await store.ensureReady()

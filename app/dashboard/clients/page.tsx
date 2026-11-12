@@ -1,6 +1,6 @@
-import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import DashboardNav from '@/app/dashboard/DashboardNav'
+import { isAuthenticated } from '@/lib/auth'
 import LogoutButton from '@/app/dashboard/LogoutButton'
 import { formatShootInstant } from '@/lib/portal/cycle'
 import { demoSeedEnabled, ensureDemoSeed } from '@/lib/portal/seed'
@@ -10,12 +10,8 @@ import RosterManager, { type ReviewItem, type RosterClient } from './RosterManag
 
 export const dynamic = 'force-dynamic'
 
-function isAuthenticated() {
-  return cookies().get('prima_session')?.value === 'authenticated'
-}
-
 export default async function ClientsPage() {
-  if (!isAuthenticated()) redirect('/dashboard')
+  if (!(await isAuthenticated())) redirect('/dashboard')
 
   let clients: RosterClient[] = []
   let reviews: ReviewItem[] = []

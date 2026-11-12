@@ -9,7 +9,7 @@ A full-stack Next.js 14 web application for collecting pre-shoot creative briefs
 - Email notifications via Resend on every submission
 - Spotify track suggestions based on music vibe selections (dashboard only)
 - Password-protected dashboard to view all submitted briefs
-- Cookie-based session auth (no third-party auth library)
+- Signed session cookie for the staff dashboard (no third-party auth library)
 - Mobile-first responsive design with a luxury real estate aesthetic
 - Client portal at `/portal` for retainer clients: plan, shoots left, next-shoot countdown, one Frame.io link, and an embedded Acuity scheduler
 - Passwordless email sign-in for roster emails, and a bearer-token endpoint that records Acuity notification emails
@@ -43,7 +43,7 @@ cp .env.local.example .env.local
 | `SPOTIFY_CLIENT_SECRET` | Yes | Spotify Developer App client secret |
 | `SPOTIFY_PLAYLIST_ID` | Yes | ID of the public Spotify playlist that powers "Reference songs" on the brief form. Grab it from the playlist URL: `open.spotify.com/playlist/<THIS_PART>?si=...` |
 | `EMAIL_API_KEY` | Yes | Resend API key (from resend.com). Also sends client-portal magic links. |
-| `DASHBOARD_PASSWORD` | Yes | Password to access the /dashboard route |
+| `DASHBOARD_PASSWORD` | Yes | Password for `/dashboard`. The session cookie is signed with a key derived from this value, so changing it signs everyone out. |
 | `APP_URL` | No | Public origin used in magic-link emails. Production: `https://brief.primavisual.io`. When unset, the link uses the request host, which is what you want on preview URLs. |
 | `ACUITY_INGEST_TOKEN` | For ingest | Bearer token for `POST /api/ingest/acuity`. The route returns 401 until this is set. |
 | `PORTAL_DEMO_SEED` | No | Set to `true` locally or on a preview deployment to load fictional `@example.com` clients and to show their sign-in links on screen. Leave unset in production. |
@@ -239,7 +239,9 @@ lib/
   email.ts         — Resend email templates
   spotify.ts       — Spotify Client Credentials API
   storage.ts       — Local disk / S3 file storage
-  auth.ts          — Cookie-based dashboard session helpers
+  auth.ts              — Signed staff-dashboard session cookie
+  dashboard-session.ts — HMAC session token (Node and Edge)
+middleware.ts          — Requires that cookie on dashboard pages and APIs
 public/
   uploads/         — Local file upload directory (dev only)
 ```

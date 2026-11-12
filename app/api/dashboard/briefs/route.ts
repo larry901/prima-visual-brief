@@ -1,14 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { isAuthenticated } from '@/lib/auth'
 import { getAllBriefs } from '@/lib/db'
-import { cookies } from 'next/headers'
-
-function isAuthenticated() {
-  const cookieStore = cookies()
-  return cookieStore.get('prima_session')?.value === 'authenticated'
-}
 
 export async function GET(_req: NextRequest) {
-  if (!isAuthenticated()) {
+  if (!(await isAuthenticated())) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
