@@ -1,4 +1,5 @@
 import type { BriefRow, BriefUpdate, NewBriefRecord } from '../db'
+import type { ClientStage } from './video-progress'
 
 export type PlanSize = 1 | 2 | 4
 export type ClientKind = 'subscription' | 'project'
@@ -19,6 +20,8 @@ export interface ClientRecord {
   billingAnchorDay: number | null
   schedulingLink: string | null
   frameioUrl: string | null
+  /** Notion Clients page this portal is allowed to see videos for. Null when unlinked. */
+  notionClientId: string | null
   active: boolean
 }
 
@@ -33,6 +36,11 @@ export interface ClientInput {
   renewalDate: string | null
   schedulingLink: string | null
   frameioUrl: string | null
+  /**
+   * Omitted on update leaves the stored page alone. Null clears it.
+   * A page URL is accepted and stored as the id.
+   */
+  notionClientId?: string | null
   active: boolean
 }
 
@@ -125,6 +133,10 @@ export interface PortalStore extends IngestStore {
   countPersonalLinkAttempts(tokenHash: string, sinceIso: string): Promise<number>
   recordPersonalLinkAttempt(tokenHash: string, nowIso: string): Promise<void>
   clearPersonalLinkAttempts(tokenHash: string): Promise<void>
+  /** Last client-facing stage for these Notion pages. Unknown ids are omitted. */
+  listVideoStages(pageIds: string[]): Promise<Map<string, ClientStage>>
+  /** Remember a client-facing stage. Internal Notion statuses are not stored. */
+  saveVideoStages(rows: { pageId: string; stage: ClientStage }[]): Promise<void>
   findBriefShootDates(name: string, email: string | string[]): Promise<string[]>
   listAllBriefs(): Promise<BriefRow[]>
   getBriefById(id: number): Promise<BriefRow | null>

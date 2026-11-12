@@ -1,8 +1,10 @@
 import { portalBriefCards } from '@/lib/brief-service'
+import { loadVideoProgress } from '@/lib/portal/notion-edits'
 import { ensureDemoSeed } from '@/lib/portal/seed'
 import { readPortalClient } from '@/lib/portal/session'
 import { getPortalStore } from '@/lib/portal/store'
 import { loadPortalView } from '@/lib/portal/view'
+import type { VideoProgressItem } from '@/lib/portal/video-progress'
 import PortalHome from './PortalHome'
 import PortalLogin from './PortalLogin'
 
@@ -34,9 +36,12 @@ export default async function PortalPage({
         />
       )
     }
-    const view = await loadPortalView(store, client)
-    const briefs = await portalBriefCards(store, client)
-    return <PortalHome view={view} briefs={briefs} />
+    const [view, briefs, videos] = await Promise.all([
+      loadPortalView(store, client),
+      portalBriefCards(store, client),
+      loadVideoProgress(store, client).catch(() => null as VideoProgressItem[] | null),
+    ])
+    return <PortalHome view={view} briefs={briefs} videos={videos} />
   } catch (error) {
     console.error('Portal failed to load:', error)
     return (

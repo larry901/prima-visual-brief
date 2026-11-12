@@ -345,3 +345,53 @@
   background: #ffffff;
   margin-top: 8px;
 }
+#videos { scroll-margin-top: 24px; }
+.portal-progress-list { list-style: none; padding: 0; margin: 16px 0 0; display: grid; gap: 14px; }
+.portal-progress-card {
+  border: 1px solid rgba(var(--portal-accent-rgb), 0.55);
+  border-radius: 14px;
+  padding: 16px;
+}
+.portal-progress-card .portal-film-label { overflow-wrap: anywhere; }
+.portal-progress-meta { color: #d4d4d4; font-size: 0.875rem; margin: 4px 0 0; }
+.portal-progress-track {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+  margin: 14px 0 0;
+  padding: 0;
+}
+.portal-progress-step { display: grid; gap: 6px; align-content: start; min-width: 0; }
+.portal-progress-bar {
+  display: block;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(var(--portal-accent-rgb), 0.35);
+}
+.portal-progress-step.is-done .portal-progress-bar,
+.portal-progress-step.is-current .portal-progress-bar { background: var(--portal-accent); }
+.portal-progress-step.is-current .portal-progress-bar { height: 6px; }
+.portal-progress-label {
+  color: #a3a3a3;
+  font-size: 11px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.portal-progress-step.is-done .portal-progress-label { color: #d4d4d4; }
+.portal-progress-step.is-current .portal-progress-label {
+  color: var(--portal-accent-text);
+  font-weight: 600;
+}
+.portal-progress-watch { margin: 12px 0 0; }
+.portal-progress-watch a {
+  color: var(--portal-accent-text);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.portal-progress-watch a:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 3px;
+}

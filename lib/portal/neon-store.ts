@@ -17,7 +17,9 @@ import {
 } from './clients'
 import { DEFAULT_COUNTED_TYPES } from './cycle'
 import { normalizeEmail } from './ingest'
+import { parseNotionPageId, storedNotionClientId } from './notion-id'
 import { PERSONAL_LINK_DAY_WINDOW_MS } from './personal-link'
+import { isClientStage, type ClientStage } from './video-progress'
 import type {
   AppointmentPatch,
   AppointmentRecord,
@@ -103,6 +105,7 @@ interface ClientRow {
   scheduling_link: string | null
   frameio_url: string | null
   frameio_links: string
+  notion_client_id: string | null
   active: boolean
 }
 
@@ -148,6 +151,7 @@ function mapClient(row: ClientRow, additionalEmails: string[] = []): ClientRecor
     billingAnchorDay: asAnchor(row.billing_anchor_day),
     schedulingLink: row.scheduling_link?.trim() || null,
     frameioUrl: readFrameioUrl(row.frameio_url) || readFrameioUrl(row.frameio_links),
+    notionClientId: parseNotionPageId(row.notion_client_id),
     active: asBool(row.active),
   }
 }
@@ -236,6 +240,7 @@ export function createNeonStore(): PortalStore {
         scheduling_link TEXT,
         frameio_url TEXT,
         frameio_links TEXT NOT NULL DEFAULT '[]',
+        notion_client_id TEXT,
         active BOOLEAN NOT NULL DEFAULT TRUE,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -293,6 +298,7 @@ export function createNeonStore(): PortalStore {
     await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS client_kind TEXT NOT NULL DEFAULT 'subscription'`
     await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS scheduling_link TEXT`
     await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS frameio_url TEXT`
+    await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS notion_client_id TEXT`
     await sql`ALTER TABLE clients ALTER COLUMN plan_size DROP NOT NULL`
     await sql`ALTER TABLE clients ALTER COLUMN renewal_date DROP NOT NULL`
     await sql`ALTER TABLE clients ALTER COLUMN billing_anchor_day DROP NOT NULL`
@@ -368,6 +374,23 @@ export function createNeonStore(): PortalStore {
     await sql`
       CREATE INDEX IF NOT EXISTS portal_link_attempts_token_created_idx
       ON portal_link_attempts (token_hash, created_at)
+    `
+    // Last client-facing edit stage per Notion page. Notion does not keep status history,
+    // and internal statuses must not replace a stage the client has already seen.
+    await sql`
+      CREATE TABLE IF NOT EXISTS video_stage_memory (
+        notion_page_id TEXT PRIMARY KEY,
+        stage TEXT NOT NULL CHECK (
+          stage IN (
+            'In Queue',
+            'Edit Started',
+            'Ready for Approval',
+            'Needs Revision',
+            'Approved'
+          )
+        ),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
     `
   }
 
@@ -483,10 +506,11 @@ export function createNeonStore(): PortalStore {
       await assertEmailsAvailable(clientEmailAddresses(emails), null)
       const plan = storedPlan(input, null)
       try {
+        const notionClientId = storedNotionClientId(input.notionClientId)
         const rows = await sql`
           INSERT INTO clients (
             name, email, company, client_kind, plan_size, renewal_date, billing_anchor_day,
-            scheduling_link, frameio_url, frameio_links, active
+            scheduling_link, frameio_url, frameio_links, notion_client_id, active
           ) VALUES (
             ${input.name},
             ${emails.email},
@@ -498,6 +522,7 @@ export function createNeonStore(): PortalStore {
             ${input.schedulingLink},
             ${input.frameioUrl},
             ${input.frameioUrl ?? '[]'},
+            ${notionClientId},
             ${input.active}
           )
           RETURNING *
@@ -520,6 +545,8 @@ export function createNeonStore(): PortalStore {
       const emails = normalizeClientEmails(input)
       await assertEmailsAvailable(clientEmailAddresses(emails), id)
       const plan = storedPlan(input, existing)
+      const notionClientId =
+        input.notionClientId === undefined ? existing.notionClientId : storedNotionClientId(input.notionClientId)
       try {
         const rows = await sql`
           UPDATE clients SET
@@ -533,6 +560,7 @@ export function createNeonStore(): PortalStore {
             scheduling_link = ${input.schedulingLink},
             frameio_url = ${input.frameioUrl},
             frameio_links = ${input.frameioUrl ?? '[]'},
+            notion_client_id = ${notionClientId},
             active = ${input.active},
             updated_at = NOW()
           WHERE id = ${id}
@@ -887,6 +915,46 @@ export function createNeonStore(): PortalStore {
       const updated = await saveBriefRecord(id, patch)
       if (!updated) throw new Error('Brief not found')
       return updated
+    },
+
+    async listVideoStages(pageIds) {
+      await ensureReady()
+      const ids = Array.from(
+        new Set(
+          pageIds
+            .map((id) => parseNotionPageId(id))
+            .filter((id): id is string => Boolean(id)),
+        ),
+      )
+      const stages = new Map<string, ClientStage>()
+      if (ids.length === 0) return stages
+      const sql = sqlClient()
+      const rows = (await sql`
+        SELECT notion_page_id, stage
+        FROM video_stage_memory
+        WHERE notion_page_id = ANY(${ids})
+      `) as { notion_page_id: string; stage: string }[]
+      for (const row of rows) {
+        if (isClientStage(row.stage)) stages.set(String(row.notion_page_id), row.stage)
+      }
+      return stages
+    },
+
+    async saveVideoStages(rows) {
+      await ensureReady()
+      const sql = sqlClient()
+      for (const row of rows) {
+        if (!isClientStage(row.stage)) continue
+        const pageId = parseNotionPageId(row.pageId)
+        if (!pageId) continue
+        await sql`
+          INSERT INTO video_stage_memory (notion_page_id, stage)
+          VALUES (${pageId}, ${row.stage})
+          ON CONFLICT (notion_page_id) DO UPDATE
+            SET stage = EXCLUDED.stage, updated_at = NOW()
+            WHERE video_stage_memory.stage IS DISTINCT FROM EXCLUDED.stage
+        `
+      }
     },
 
     async findBriefShootDates(name, email) {

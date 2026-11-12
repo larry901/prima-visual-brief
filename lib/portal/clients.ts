@@ -1,5 +1,6 @@
 import { isIsoDate } from './cycle'
 import { normalizeEmail } from './ingest'
+import { parseNotionPageId } from './notion-id'
 import type { ClientInput, ClientKind, PlanSize } from './types'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -89,6 +90,8 @@ export function parseClientInput(body: unknown): { ok: true; value: ClientInput 
   if (!additionalEmails.ok) return additionalEmails
   const frameioUrl = parseFrameioUrl(record.frameioUrl ?? record.frameioLinks)
   if (!frameioUrl.ok) return frameioUrl
+  const notionClientId = parseNotionClient(record)
+  if (!notionClientId.ok) return notionClientId
   const kind = parseKind(record.kind)
   if (!kind.ok) return kind
   const schedulingLink = parseSchedulingLink(record.schedulingLink)
@@ -106,6 +109,7 @@ export function parseClientInput(body: unknown): { ok: true; value: ClientInput 
         renewalDate: null,
         schedulingLink: schedulingLink.value,
         frameioUrl: frameioUrl.value,
+        notionClientId: notionClientId.value,
         active,
       },
     }
@@ -125,9 +129,23 @@ export function parseClientInput(body: unknown): { ok: true; value: ClientInput 
       renewalDate,
       schedulingLink: schedulingLink.value,
       frameioUrl: frameioUrl.value,
+      notionClientId: notionClientId.value,
       active,
     },
   }
+}
+
+function parseNotionClient(
+  record: Record<string, unknown>,
+): { ok: true; value: string | null | undefined } | { ok: false; error: string } {
+  const provided = 'notionClient' in record || 'notionClientId' in record
+  if (!provided) return { ok: true, value: undefined }
+  const raw = 'notionClient' in record ? record.notionClient : record.notionClientId
+  if (raw == null || raw === '') return { ok: true, value: null }
+  if (typeof raw !== 'string') return { ok: false, error: 'Notion client must be a Notion page link or id' }
+  const id = parseNotionPageId(raw)
+  if (!id) return { ok: false, error: 'Notion client must be a Notion page link or id' }
+  return { ok: true, value: id }
 }
 
 function parseAdditionalEmails(
