@@ -6,7 +6,7 @@ import { getPortalStore } from '@/lib/portal/store'
 export const dynamic = 'force-dynamic'
 
 export async function PUT(request: Request) {
-  if (!isAuthenticated()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!(await isAuthenticated())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const body = await request.json().catch(() => null)
   const types = parseCountedTypes(
     body && typeof body === 'object' ? (body as { countedTypes?: unknown }).countedTypes : null,

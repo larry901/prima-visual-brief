@@ -1,18 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { dashboardPasswordMatches, setAuthCookie } from '@/lib/auth'
 
 export async function POST(req: NextRequest) {
-  const { password } = await req.json()
+  let password: unknown
+  try {
+    const body: unknown = await req.json()
+    password =
+      body && typeof body === 'object' && 'password' in body
+        ? (body as { password?: unknown }).password
+        : undefined
+  } catch {
+    return NextResponse.json({ error: 'Invalid password' }, { status: 401 })
+  }
 
-  if (password !== process.env.DASHBOARD_PASSWORD) {
+  if (!(await dashboardPasswordMatches(password))) {
     return NextResponse.json({ error: 'Invalid password' }, { status: 401 })
   }
 
   const res = NextResponse.json({ success: true })
-  res.cookies.set('prima_session', 'authenticated', {
-    httpOnly: true,
-    sameSite: 'lax',
-    maxAge: 60 * 60 * 24 * 7,
-    path: '/',
-  })
+  await setAuthCookie(res)
   return res
 }
