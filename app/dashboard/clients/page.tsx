@@ -8,6 +8,7 @@ import { originFromHeaders } from '@/lib/portal/origin'
 import { personalLinkUrl, personalLinksForClients } from '@/lib/portal/personal-link'
 import { demoSeedEnabled, ensureDemoSeed } from '@/lib/portal/seed'
 import { getPortalStore } from '@/lib/portal/store'
+import { parseRosterView } from '@/lib/portal/roster-view'
 import { loadPortalView } from '@/lib/portal/view'
 import RosterManager, { type ReviewItem, type RosterClient } from './RosterManager'
 
@@ -18,7 +19,12 @@ function portalLinkFor(origin: string, token: string | null | undefined): string
   return personalLinkUrl(origin, token)
 }
 
-export default async function ClientsPage() {
+export default async function ClientsPage({
+  searchParams,
+}: {
+  searchParams: { view?: string | string[] }
+}) {
+  const rosterView = parseRosterView(searchParams.view)
   if (!(await isAuthenticated())) redirect('/dashboard')
 
   let clients: RosterClient[] = []
@@ -112,6 +118,7 @@ export default async function ClientsPage() {
             reviews={reviews}
             countedTypes={countedTypes}
             demoEnabled={demoSeedEnabled()}
+            rosterView={rosterView}
           />
         )}
       </div>
