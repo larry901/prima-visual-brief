@@ -357,16 +357,16 @@ function RosterViewSwitch({
             aria-selected={selected}
             aria-controls="roster-panel"
             tabIndex={selected ? 0 : -1}
-            className={`flex min-h-11 touch-manipulation items-center justify-center gap-2 rounded-md px-2 py-2 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-dark/40 sm:px-3 ${
+            className={`flex min-h-11 w-full min-w-0 touch-manipulation flex-col items-center justify-center gap-0.5 rounded-md px-1.5 py-1.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-dark/40 sm:flex-row sm:gap-2 sm:px-3 ${
               selected ? 'bg-brand-dark text-white' : 'text-brand-dark hover:bg-brand-bg'
             }`}
             onClick={() => onChange(option.view)}
             onKeyDown={(event) => onKeyDown(event, index)}
           >
-            <span className="text-center leading-snug">{option.label}</span>
+            <span className="max-w-full text-center text-[13px] leading-tight sm:text-sm">{option.label}</span>
             <span
-              className={`inline-flex min-w-[1.25rem] shrink-0 items-center justify-center rounded-full px-1.5 text-xs font-medium tabular-nums ${
-                selected ? 'bg-white/20 text-white' : 'bg-brand-bg text-brand-dark'
+              className={`inline-flex min-w-[1.25rem] shrink-0 items-center justify-center rounded-full px-1.5 text-xs font-semibold tabular-nums ${
+                selected ? 'bg-white text-brand-dark' : 'bg-brand-bg text-brand-dark'
               }`}
             >
               {count}
