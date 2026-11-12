@@ -1,7 +1,17 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type KeyboardEvent } from 'react'
 import { useRouter } from 'next/navigation'
+import {
+  ROSTER_VIEW_OPTIONS,
+  countClientsByRosterView,
+  filterClientsByRosterView,
+  kindForRosterView,
+  rosterEmptyMessage,
+  rosterPlanSummary,
+  rosterViewHref,
+  type RosterView,
+} from '@/lib/portal/roster-view'
 import type { ClientKind, PlanSize } from '@/lib/portal/types'
 
 export interface RosterClient {
@@ -81,17 +91,37 @@ export default function RosterManager({
   reviews,
   countedTypes,
   demoEnabled,
+  rosterView,
 }: {
   clients: RosterClient[]
   reviews: ReviewItem[]
   countedTypes: string[]
   demoEnabled: boolean
+  rosterView: RosterView
 }) {
   const router = useRouter()
   const [openId, setOpenId] = useState<number | 'new' | null>(null)
   const [types, setTypes] = useState(countedTypes.join('\n'))
   const [typesMessage, setTypesMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [pendingView, setPendingView] = useState<RosterView | null>(null)
+  if (pendingView !== null && pendingView === rosterView) {
+    setPendingView(null)
+  }
+  const view = pendingView ?? rosterView
+  const counts = countClientsByRosterView(clients)
+  const visibleClients = filterClientsByRosterView(clients, view)
+
+  const selectView = (next: RosterView) => {
+    if (next === view) return
+    if (typeof openId === 'number') {
+      const kind = kindForRosterView(next)
+      const staysOpen = clients.some((client) => client.id === openId && client.kind === kind)
+      if (!staysOpen) setOpenId(null)
+    }
+    setPendingView(next)
+    router.replace(rosterViewHref(next), { scroll: false })
+  }
 
   const saveTypes = async () => {
     setBusy(true)
@@ -134,6 +164,7 @@ export default function RosterManager({
             {openId === 'new' ? 'Close' : 'Add client'}
           </button>
         </div>
+        <RosterViewSwitch view={view} counts={counts} onChange={selectView} />
         {openId === 'new' && (
           <ClientForm
             draft={emptyDraft()}
@@ -151,86 +182,87 @@ export default function RosterManager({
             }}
           />
         )}
-        {clients.length === 0 ? (
-          <div className="card p-10 text-center text-brand-muted">No clients yet.</div>
-        ) : (
-          <ul className="space-y-3">
-            {clients.map((client) => (
-              <li key={client.id} className="card p-5">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <p className="font-medium">
-                      {client.name}{' '}
-                      {!client.active && (
-                        <span className="ml-2 text-xs uppercase tracking-wide text-brand-muted">Inactive</span>
-                      )}
-                    </p>
-                    <p className="text-sm text-brand-muted">{client.email}</p>
-                    {client.additionalEmails.length > 0 && (
-                      <p className="text-sm text-brand-muted">{client.additionalEmails.join(', ')}</p>
-                    )}
-                    {client.company && <p className="text-sm text-brand-muted">{client.company}</p>}
-                  </div>
-                  <div className="text-sm sm:text-right">
-                    {client.kind === 'project' ? (
-                      <p>Per project</p>
-                    ) : (
-                      <>
-                        <p>
-                          {client.planSize}/month · {client.remaining} left
+        <div id="roster-panel" role="tabpanel" aria-labelledby={`roster-tab-${view}`}>
+          {visibleClients.length === 0 ? (
+            <div className="card p-10 text-center text-brand-muted">{rosterEmptyMessage(view, clients.length)}</div>
+          ) : (
+            <ul className="space-y-3">
+              {visibleClients.map((client) => {
+                const plan = rosterPlanSummary(client, view)
+                return (
+                  <li key={client.id} className="card p-5">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <p className="font-medium">
+                          {client.name}{' '}
+                          {!client.active && (
+                            <span className="ml-2 text-xs uppercase tracking-wide text-brand-muted">Inactive</span>
+                          )}
                         </p>
-                        <p className="text-brand-muted">Renews {client.renewalLabel}</p>
-                        {client.missingSchedulingLink && (
-                          <p className="text-red-700">Missing scheduling link</p>
+                        <p className="text-sm text-brand-muted">{client.email}</p>
+                        {client.additionalEmails.length > 0 && (
+                          <p className="text-sm text-brand-muted">{client.additionalEmails.join(', ')}</p>
                         )}
-                      </>
+                        {client.company && <p className="text-sm text-brand-muted">{client.company}</p>}
+                      </div>
+                      <div className="text-sm sm:text-right">
+                        {plan && (
+                          <>
+                            <p>{plan.planLine}</p>
+                            <p className="text-brand-muted">{plan.renewalLine}</p>
+                            {plan.missingSchedulingLink && (
+                              <p className="text-red-700">Missing scheduling link</p>
+                            )}
+                          </>
+                        )}
+                        <button
+                          type="button"
+                          className={`${plan ? 'mt-2 ' : ''}text-sm text-brand-dark underline`}
+                          onClick={() => setOpenId(openId === client.id ? null : client.id)}
+                        >
+                          {openId === client.id ? 'Close' : 'Edit'}
+                        </button>
+                      </div>
+                    </div>
+                    <PersonalLinkControls clientId={client.id} url={client.portalUrl} active={client.active} />
+                    {client.appointments.length > 0 && (
+                      <ul className="mt-4 space-y-1 text-sm text-brand-muted">
+                        {client.appointments.map((appointment) => (
+                          <li key={appointment.id}>
+                            {appointment.status === 'cancelled' ? 'Cancelled' : appointment.status === 'rescheduled' ? 'Rescheduled' : 'Scheduled'}
+                            {' · '}
+                            {appointment.type}
+                            {' · '}
+                            {appointment.label}
+                          </li>
+                        ))}
+                      </ul>
                     )}
-                    <button
-                      type="button"
-                      className="mt-2 text-sm text-brand-dark underline"
-                      onClick={() => setOpenId(openId === client.id ? null : client.id)}
-                    >
-                      {openId === client.id ? 'Close' : 'Edit'}
-                    </button>
-                  </div>
-                </div>
-                <PersonalLinkControls clientId={client.id} url={client.portalUrl} active={client.active} />
-                {client.appointments.length > 0 && (
-                  <ul className="mt-4 space-y-1 text-sm text-brand-muted">
-                    {client.appointments.map((appointment) => (
-                      <li key={appointment.id}>
-                        {appointment.status === 'cancelled' ? 'Cancelled' : appointment.status === 'rescheduled' ? 'Rescheduled' : 'Scheduled'}
-                        {' · '}
-                        {appointment.type}
-                        {' · '}
-                        {appointment.label}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {openId === client.id && (
-                  <div className="mt-4">
-                    <ClientForm
-                      draft={draftFrom(client)}
-                      submitLabel="Save client"
-                      onSubmit={async (draft) => {
-                        const response = await fetch(`/api/dashboard/clients/${client.id}`, {
-                          method: 'PATCH',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify(draft),
-                        })
-                        const data = await response.json()
-                        if (!response.ok) throw new Error(data.error || 'Could not save client')
-                        setOpenId(null)
-                        router.refresh()
-                      }}
-                    />
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
+                    {openId === client.id && (
+                      <div className="mt-4">
+                        <ClientForm
+                          draft={draftFrom(client)}
+                          submitLabel="Save client"
+                          onSubmit={async (draft) => {
+                            const response = await fetch(`/api/dashboard/clients/${client.id}`, {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify(draft),
+                            })
+                            const data = await response.json()
+                            if (!response.ok) throw new Error(data.error || 'Could not save client')
+                            setOpenId(null)
+                            router.refresh()
+                          }}
+                        />
+                      </div>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
       </section>
 
       <section className="space-y-3">
@@ -278,6 +310,70 @@ export default function RosterManager({
           Save types
         </button>
       </section>
+    </div>
+  )
+}
+
+function RosterViewSwitch({
+  view,
+  counts,
+  onChange,
+}: {
+  view: RosterView
+  counts: Record<RosterView, number>
+  onChange: (view: RosterView) => void
+}) {
+  const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const last = ROSTER_VIEW_OPTIONS.length - 1
+    let nextIndex: number | null = null
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') nextIndex = index === last ? 0 : index + 1
+    else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') nextIndex = index === 0 ? last : index - 1
+    else if (event.key === 'Home') nextIndex = 0
+    else if (event.key === 'End') nextIndex = last
+    if (nextIndex == null || nextIndex === index) return
+    event.preventDefault()
+    const next = ROSTER_VIEW_OPTIONS[nextIndex].view
+    onChange(next)
+    requestAnimationFrame(() => {
+      document.getElementById(`roster-tab-${next}`)?.focus()
+    })
+  }
+
+  return (
+    <div
+      role="tablist"
+      aria-label="Roster"
+      className="grid grid-cols-2 gap-1 rounded-lg border border-brand-border bg-white p-1"
+    >
+      {ROSTER_VIEW_OPTIONS.map((option, index) => {
+        const selected = view === option.view
+        const count = counts[option.view]
+        return (
+          <button
+            key={option.view}
+            type="button"
+            role="tab"
+            id={`roster-tab-${option.view}`}
+            aria-selected={selected}
+            aria-controls="roster-panel"
+            tabIndex={selected ? 0 : -1}
+            className={`flex min-h-11 w-full min-w-0 touch-manipulation flex-col items-center justify-center gap-0.5 rounded-md px-1.5 py-1.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-dark/40 sm:flex-row sm:gap-2 sm:px-3 ${
+              selected ? 'bg-brand-dark text-white' : 'text-brand-dark hover:bg-brand-bg'
+            }`}
+            onClick={() => onChange(option.view)}
+            onKeyDown={(event) => onKeyDown(event, index)}
+          >
+            <span className="max-w-full text-center text-[13px] leading-tight sm:text-sm">{option.label}</span>
+            <span
+              className={`inline-flex min-w-[1.25rem] shrink-0 items-center justify-center rounded-full px-1.5 text-xs font-semibold tabular-nums ${
+                selected ? 'bg-white text-brand-dark' : 'bg-brand-bg text-brand-dark'
+              }`}
+            >
+              {count}
+            </span>
+          </button>
+        )
+      })}
     </div>
   )
 }
