@@ -1,8 +1,19 @@
 import Countdown from './Countdown'
 import SignOutButton from './SignOutButton'
+import VideoProgress from './VideoProgress'
 import type { PortalBriefCard } from '@/lib/brief-service'
+import type { VideoProgressItem } from '@/lib/portal/video-progress'
 import { shootsPerMonthLabel, type PortalView } from '@/lib/portal/view'
-export default function PortalHome({ view, briefs }: { view: PortalView; briefs: PortalBriefCard[] }) {
+
+export default function PortalHome({
+  view,
+  briefs,
+  videos,
+}: {
+  view: PortalView
+  briefs: PortalBriefCard[]
+  videos: VideoProgressItem[] | null
+}) {
   const firstName = view.name.split(/\s+/)[0] || view.name
   const needsBrief = view.upcoming.some((appointment) => appointment.needsBrief)
 
@@ -72,7 +83,9 @@ export default function PortalHome({ view, briefs }: { view: PortalView; briefs:
             )}
           </section>
 
-          <section className="portal-block portal-films" aria-labelledby="videos-heading">
+          {videos && <VideoProgress videos={videos} />}
+
+          <section id="videos" tabIndex={-1} className="portal-block portal-films" aria-labelledby="videos-heading">
             {view.frameioUrl ? (
               <a
                 id="videos-heading"

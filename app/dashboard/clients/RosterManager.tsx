@@ -12,6 +12,7 @@ import {
   rosterViewHref,
   type RosterView,
 } from '@/lib/portal/roster-view'
+import { parseNotionPageId } from '@/lib/portal/notion-id'
 import type { ClientKind, PlanSize } from '@/lib/portal/types'
 
 export interface RosterClient {
@@ -26,6 +27,7 @@ export interface RosterClient {
   schedulingLink: string | null
   missingSchedulingLink: boolean
   frameioUrl: string | null
+  notionClientId: string | null
   active: boolean
   remaining: number
   used: number
@@ -56,6 +58,7 @@ interface Draft {
   schedulingLink: string
   active: boolean
   frameioUrl: string
+  notionClient: string
 }
 
 const emptyDraft = (): Draft => ({
@@ -69,6 +72,7 @@ const emptyDraft = (): Draft => ({
   schedulingLink: '',
   active: true,
   frameioUrl: '',
+  notionClient: '',
 })
 
 function draftFrom(client: RosterClient): Draft {
@@ -83,6 +87,7 @@ function draftFrom(client: RosterClient): Draft {
     schedulingLink: client.schedulingLink ?? '',
     active: client.active,
     frameioUrl: client.frameioUrl ?? '',
+    notionClient: client.notionClientId ?? '',
   }
 }
 
@@ -204,6 +209,7 @@ export default function RosterManager({
                           <p className="text-sm text-brand-muted">{client.additionalEmails.join(', ')}</p>
                         )}
                         {client.company && <p className="text-sm text-brand-muted">{client.company}</p>}
+                        {client.notionClientId && <p className="text-sm text-brand-muted">Notion client linked</p>}
                       </div>
                       <div className="text-sm sm:text-right">
                         {plan && (
@@ -659,6 +665,11 @@ function ClientForm({
         </label>
       </div>
 
+      <NotionClientField
+        value={form.notionClient}
+        onChange={(notionClient) => setForm({ ...form, notionClient })}
+      />
+
       <label className="block text-sm" htmlFor="frameio-url">
         <span className="font-medium">Frame.io link</span>
         <input
@@ -682,6 +693,111 @@ function ClientForm({
         {saving ? 'Saving…' : submitLabel}
       </button>
     </form>
+  )
+}
+
+interface NotionClientOption {
+  id: string
+  name: string
+}
+
+function NotionClientField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const [options, setOptions] = useState<NotionClientOption[] | null>(null)
+  const [unavailable, setUnavailable] = useState(false)
+  const parsed = parseNotionPageId(value)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/dashboard/notion-clients')
+      .then(async (response) => {
+        if (!response.ok) throw new Error('unavailable')
+        return response.json() as Promise<{ configured?: boolean; unavailable?: boolean; clients?: unknown }>
+      })
+      .then((data) => {
+        if (cancelled) return
+        if (!data.configured) {
+          setOptions(null)
+          return
+        }
+        if (data.unavailable) {
+          setUnavailable(true)
+          setOptions(null)
+          return
+        }
+        const clients = Array.isArray(data.clients)
+          ? data.clients.flatMap((entry) => {
+              if (!entry || typeof entry !== 'object') return []
+              const row = entry as { id?: unknown; name?: unknown }
+              if (typeof row.id !== 'string' || typeof row.name !== 'string') return []
+              const id = parseNotionPageId(row.id)
+              if (!id) return []
+              return [{ id, name: row.name.trim() || 'Untitled' }]
+            })
+          : []
+        setOptions(clients)
+      })
+      .catch(() => {
+        if (!cancelled) setUnavailable(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const matched = Boolean(parsed && options?.some((option) => option.id === parsed))
+
+  return (
+    <div className="space-y-3">
+      {options && options.length > 0 && (
+        <label className="block text-sm" htmlFor="notion-client-choice">
+          <span className="font-medium">Notion client</span>
+          <select
+            id="notion-client-choice"
+            className="input mt-1.5"
+            value={parsed ?? ''}
+            onChange={(event) => onChange(event.target.value)}
+          >
+            <option value="">Not linked</option>
+            {parsed && !matched && <option value={parsed}>Pasted page</option>}
+            {options.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      <label className="block text-sm" htmlFor="notion-client">
+        <span className="font-medium">{options && options.length > 0 ? 'Or paste a Notion page link' : 'Notion client'}</span>
+        <input
+          id="notion-client"
+          className="input mt-1.5"
+          type="text"
+          inputMode="url"
+          autoComplete="off"
+          spellCheck={false}
+          placeholder="https://www.notion.so/…"
+          aria-invalid={value.trim() !== '' && !parsed}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          onBlur={() => {
+            const id = parseNotionPageId(value)
+            if (id) onChange(id)
+          }}
+        />
+        <span className="mt-1 block text-xs text-brand-muted">
+          Optional. Paste a Notion Clients page link, or pick the page when Notion is connected. This client only sees videos related to that page.
+        </span>
+        {value.trim() && !parsed && (
+          <span className="mt-1 block text-xs text-red-600">That doesn&apos;t look like a Notion page link.</span>
+        )}
+        {unavailable && (
+          <span className="mt-1 block text-xs text-brand-muted">
+            Notion clients couldn&apos;t be loaded. Paste a page link instead.
+          </span>
+        )}
+      </label>
+    </div>
   )
 }
 

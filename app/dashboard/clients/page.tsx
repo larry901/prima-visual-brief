@@ -79,6 +79,7 @@ export default async function ClientsPage({
         schedulingLink: client.schedulingLink,
         missingSchedulingLink: client.kind === 'subscription' && !client.schedulingLink,
         frameioUrl: client.frameioUrl,
+        notionClientId: client.notionClientId,
         active: client.active,
         remaining: view.remaining,
         used: view.used,
@@ -107,7 +108,7 @@ export default async function ClientsPage({
         <div className="mb-8">
           <h1 className="font-display text-3xl font-semibold">Clients</h1>
           <p className="text-brand-muted text-sm mt-2">
-            Subscription clients have a plan, a renewal date, and a private scheduling link. Per-project clients use the shared scheduler. Extra emails on a client can sign in, and their bookings count on that client. Each client also has a personal link you can send when a video is ready.
+            Subscription clients have a plan, a renewal date, and a private scheduling link. Per-project clients use the shared scheduler. Extra emails on a client can sign in, and their bookings count on that client. Each client also has a personal link you can send when a video is ready. An optional Notion client links their portal to videos in the Prima Visual Edit database.
           </p>
         </div>
         {loadError ? (

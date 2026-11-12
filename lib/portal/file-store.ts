@@ -83,6 +83,8 @@ export function createFileStore(filePath: string): PortalStore {
     recordPersonalLinkAttempt: (tokenHash, nowIso) =>
       run((store) => store.recordPersonalLinkAttempt(tokenHash, nowIso)),
     clearPersonalLinkAttempts: (tokenHash) => run((store) => store.clearPersonalLinkAttempts(tokenHash)),
+    listVideoStages: (pageIds) => run((store) => store.listVideoStages(pageIds)),
+    saveVideoStages: (rows) => run((store) => store.saveVideoStages(rows)),
     findBriefShootDates: (name, email) => run((store) => store.findBriefShootDates(name, email)),
     listAllBriefs: () => run((store) => store.listAllBriefs()),
     getBriefById: (id) => run((store) => store.getBriefById(id)),

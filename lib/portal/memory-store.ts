@@ -3,7 +3,10 @@ import { attachClientEmails, clientEmailAddresses, normalizeClientEmails, readFr
 import { DEFAULT_COUNTED_TYPES } from './cycle'
 import { clientOwnsBrief } from '../brief-logic'
 import { normalizeEmail } from './ingest'
+import { parseNotionPageId, storedNotionClientId } from './notion-id'
 import { PERSONAL_LINK_DAY_WINDOW_MS } from './personal-link'
+import type { ClientStage } from './video-progress'
+import { isClientStage } from './video-progress'
 import type {
   AppointmentPatch,
   AppointmentRecord,
@@ -44,6 +47,7 @@ export interface MemoryData {
   countedTypes: string[]
   briefShootDates: { name: string; email: string; shootDate: string }[]
   briefs: BriefRow[]
+  videoStages: { pageId: string; stage: ClientStage }[]
   seq: { client: number; appointment: number; magic: number; brief: number }
 }
 
@@ -58,6 +62,7 @@ export function emptyMemoryData(): MemoryData {
     countedTypes: [...DEFAULT_COUNTED_TYPES],
     briefShootDates: [],
     briefs: [],
+    videoStages: [],
     seq: { client: 1, appointment: 1, magic: 1, brief: 1 },
   }
 }
@@ -95,8 +100,10 @@ export class MemoryStore implements PortalStore {
       if (client.schedulingLink === undefined) client.schedulingLink = null
       if (!client.frameioUrl) client.frameioUrl = readFrameioUrl(legacy.frameioLinks)
       client.additionalEmails = emailList(client.additionalEmails).filter((email) => email !== normalizeEmail(client.email))
+      client.notionClientId = parseNotionPageId(client.notionClientId)
     }
     if (!this.data.briefs) this.data.briefs = []
+    if (!Array.isArray(this.data.videoStages)) this.data.videoStages = []
     if (!this.data.seq.brief) this.data.seq.brief = 1
     if (!Array.isArray(this.data.personalLinks)) this.data.personalLinks = []
     if (!Array.isArray(this.data.personalAttempts)) this.data.personalAttempts = []
@@ -133,6 +140,7 @@ export class MemoryStore implements PortalStore {
       billingAnchorDay: plan.billingAnchorDay,
       schedulingLink: input.schedulingLink,
       frameioUrl: input.frameioUrl,
+      notionClientId: storedNotionClientId(input.notionClientId),
       active: input.active,
     }
     this.data.clients.push(client)
@@ -156,6 +164,9 @@ export class MemoryStore implements PortalStore {
     client.billingAnchorDay = plan.billingAnchorDay
     client.schedulingLink = input.schedulingLink
     client.frameioUrl = input.frameioUrl
+    if (input.notionClientId !== undefined) {
+      client.notionClientId = storedNotionClientId(input.notionClientId)
+    }
     client.active = input.active
     await attachClientEmails(this, client)
     return client
@@ -353,6 +364,31 @@ export class MemoryStore implements PortalStore {
 
   async clearPersonalLinkAttempts(tokenHash: string): Promise<void> {
     this.data.personalAttempts = this.data.personalAttempts.filter((row) => row.tokenHash !== tokenHash)
+  }
+
+  async listVideoStages(pageIds: string[]): Promise<Map<string, ClientStage>> {
+    const wanted = new Set(
+      pageIds
+        .map((id) => parseNotionPageId(id))
+        .filter((id): id is string => Boolean(id)),
+    )
+    const stages = new Map<string, ClientStage>()
+    for (const row of this.data.videoStages) {
+      if (!wanted.has(row.pageId) || !isClientStage(row.stage)) continue
+      stages.set(row.pageId, row.stage)
+    }
+    return stages
+  }
+
+  async saveVideoStages(rows: { pageId: string; stage: ClientStage }[]): Promise<void> {
+    for (const row of rows) {
+      if (!isClientStage(row.stage)) continue
+      const pageId = parseNotionPageId(row.pageId)
+      if (!pageId) continue
+      const existing = this.data.videoStages.find((stage) => stage.pageId === pageId)
+      if (existing) existing.stage = row.stage
+      else this.data.videoStages.push({ pageId, stage: row.stage })
+    }
   }
 
   async findBriefShootDates(name: string, email: string | string[]): Promise<string[]> {

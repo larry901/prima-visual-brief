@@ -11,7 +11,7 @@ A full-stack Next.js 14 web application for collecting pre-shoot creative briefs
 - Password-protected dashboard to view all submitted briefs
 - Signed session cookie for the staff dashboard (no third-party auth library)
 - Mobile-first responsive design with a luxury real estate aesthetic
-- Client portal at `/portal` for retainer clients: plan, shoots left, next-shoot countdown, one Frame.io link, and an embedded Acuity scheduler
+- Client portal at `/portal` for retainer clients: plan, shoots left, next-shoot countdown, one Frame.io link, video edit progress from Notion, and an embedded Acuity scheduler
 - Passwordless email sign-in for roster emails, and a bearer-token endpoint that records Acuity notification emails
 
 ## Prerequisites
@@ -47,6 +47,7 @@ cp .env.local.example .env.local
 | `APP_URL` | No | Public origin used in magic-link emails. Production: `https://brief.primavisual.io`. When unset, the link uses the request host, which is what you want on preview URLs. |
 | `ACUITY_INGEST_TOKEN` | For ingest | Bearer token for `POST /api/ingest/acuity`. The route returns 401 until this is set. |
 | `PORTAL_DEMO_SEED` | No | Set to `true` locally or on a preview deployment to load fictional `@example.com` clients and to show their sign-in links on screen. Leave unset in production. |
+| `NOTION_TOKEN` | No | Read-only internal integration token for the Prima Visual Edit database. When set, a linked client sees Video progress on `/portal`, and Clients can pick a Notion page. When unset, or if Notion errors, that section is hidden. |
 
 ### Setting up Neon Postgres
 
@@ -107,6 +108,7 @@ npm start
    - `SPOTIFY_CLIENT_SECRET`
    - `EMAIL_API_KEY`
    - `DASHBOARD_PASSWORD`
+   - `NOTION_TOKEN` (optional; leave unset until the integration is ready)
 5. Deploy
 
 ### File Uploads on Vercel
@@ -128,6 +130,12 @@ Clients sign in at `/portal`. There are two kinds:
 
 Both kinds see one card labeled **View your Videos**, or “Videos coming soon” when that link is empty, then the briefs they submitted, the countdown, and **Fill out your brief**.
 
+### Video progress
+
+When `NOTION_TOKEN` is set, a signed-in client whose roster row has a Notion client page sees **Video progress**. The portal reads that client's rows from the Prima Visual Edit database and shows five stages: In Queue, Edit Started, Ready for Approval, Needs Revision, and Approved. Internal edit statuses are not shown. The last client-facing stage is stored in `video_stage_memory`, so a later internal status does not move the indicator backward. Approved videos leave the list 30 days after the completed date. Ready for Approval and Approved point at the **View your Videos** card. The section is omitted when the token is missing, the client is not linked, or Notion cannot be reached. Responses are reused for about 60 seconds.
+
+On **Clients**, **Notion client** is optional. Paste a Notion page link (the id is taken from the URL) or pick a page from the Clients database when the token is set. A client only receives videos whose Client relation includes that page.
+
 A client only sees their own briefs from the last two months in America/Chicago, using the shoot date, or the submission date when there is no shoot date. A future shoot always stays on the list. Older briefs are not deleted: staff still see them, and a direct link still opens one read-only. They can edit a brief until the shoot starts (the appointment time that day, or midnight Chicago when the brief only has a date). After that it is read-only. Edits save over the same submission, keep the previous version, mark **Edited by client** on the dashboard, and email the team through Resend. The confirmation screen also includes a private edit link.
 
 Acuity is on the Standard plan, so the app does not call the Acuity API. The brief link opens the existing form with name, email, and shoot date filled in when those are known. Scheduling links are shown only to that signed-in client and to staff in the dashboard. They are not written to logs.
@@ -144,7 +152,7 @@ Only appointment types in the dashboard list **Shoots that count** use up a shoo
 
 ### Storage
 
-The portal uses the Neon database the brief form already uses (`POSTGRES_URL`). New tables (`clients`, `client_emails`, `appointments`, `magic_links`, `portal_sessions`, `portal_settings`, `client_portal_links`, `portal_link_attempts`) are created on the first portal, roster, or ingest request. `client_emails` only stores addresses beyond the primary, so existing clients are unchanged. No second database, no manual migration, and no paid plan.
+The portal uses the Neon database the brief form already uses (`POSTGRES_URL`). New tables (`clients`, `client_emails`, `appointments`, `magic_links`, `portal_sessions`, `portal_settings`, `client_portal_links`, `portal_link_attempts`, `video_stage_memory`) are created on the first portal, roster, or ingest request, and `clients.notion_client_id` is added the same way. `client_emails` only stores addresses beyond the primary, so existing clients are unchanged. No second database, no manual migration, and no paid plan.
 
 If this project does not have Neon yet:
 
