@@ -72,10 +72,17 @@ async function cached<T>(key: string, load: () => Promise<T>): Promise<T> {
   return promise
 }
 
+/** Fresh staff refreshes skip the in-memory map and Next's data cache. */
+export function staffEditFetchCache(fresh: boolean): { cache?: 'no-store'; next?: { revalidate: number } } {
+  if (fresh) return { cache: 'no-store' }
+  return { next: { revalidate: 60 } }
+}
+
 async function notionQuery(
   dataSourceId: string,
   body: Record<string, unknown>,
   fetchImpl: NotionFetch,
+  fresh = false,
 ): Promise<unknown[]> {
   const token = process.env.NOTION_TOKEN?.trim()
   if (!token) throw new Error('Notion is not configured')
@@ -94,7 +101,7 @@ async function notionQuery(
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),
-        next: { revalidate: 60 },
+        ...staffEditFetchCache(fresh),
         signal: AbortSignal.timeout(8_000),
       })
     } catch {
@@ -113,8 +120,8 @@ async function notionQuery(
   return pages
 }
 
-async function queryAllEdits(fetchImpl: NotionFetch): Promise<NotionEditSnapshot[]> {
-  const raw = await notionQuery(EDIT_DATA_SOURCE_ID, {}, fetchImpl)
+async function queryAllEdits(fetchImpl: NotionFetch, fresh = false): Promise<NotionEditSnapshot[]> {
+  const raw = await notionQuery(EDIT_DATA_SOURCE_ID, {}, fetchImpl, fresh)
   return raw.map((page) => snapshotFromNotionPage(page)).filter((page): page is NotionEditSnapshot => page != null)
 }
 
@@ -153,8 +160,8 @@ function pageTitle(page: unknown): string {
   return 'Untitled'
 }
 
-async function queryClients(fetchImpl: NotionFetch): Promise<{ id: string; name: string }[]> {
-  const raw = await notionQuery(CLIENTS_DATA_SOURCE_ID, {}, fetchImpl)
+async function queryClients(fetchImpl: NotionFetch, fresh = false): Promise<{ id: string; name: string }[]> {
+  const raw = await notionQuery(CLIENTS_DATA_SOURCE_ID, {}, fetchImpl, fresh)
   const clients: { id: string; name: string }[] = []
   for (const page of raw) {
     if (!page || typeof page !== 'object') continue
@@ -172,13 +179,17 @@ async function queryClients(fetchImpl: NotionFetch): Promise<{ id: string; name:
  * Every row in the Edit database, for staff. Internal statuses are included.
  * Null when Notion is not configured or the request failed.
  */
-export async function loadStaffEditBoard(fetchImpl?: NotionFetch): Promise<StaffEdit[] | null> {
+export async function loadStaffEditBoard(
+  fetchImpl?: NotionFetch,
+  options?: { fresh?: boolean },
+): Promise<StaffEdit[] | null> {
   if (!notionConfigured()) return null
+  const fresh = options?.fresh === true
   try {
-    const loadPages = () => queryAllEdits(fetchImpl ?? defaultFetch)
+    const loadPages = () => queryAllEdits(fetchImpl ?? defaultFetch, fresh)
     const [pages, clients] = await Promise.all([
-      fetchImpl ? loadPages() : cached('edits:all', loadPages),
-      listNotionClients(fetchImpl),
+      fetchImpl || fresh ? loadPages() : cached('edits:all', loadPages),
+      listNotionClients(fetchImpl, { fresh }),
     ])
     const names = new Map(clients.map((client) => [client.id, client.name]))
     return pages.map((page) => staffEditFromSnapshot(page, names))
@@ -188,9 +199,14 @@ export async function loadStaffEditBoard(fetchImpl?: NotionFetch): Promise<Staff
   }
 }
 
-export async function listNotionClients(fetchImpl?: NotionFetch): Promise<{ id: string; name: string }[]> {
+export async function listNotionClients(
+  fetchImpl?: NotionFetch,
+  options?: { fresh?: boolean },
+): Promise<{ id: string; name: string }[]> {
   if (!notionConfigured()) return []
-  if (fetchImpl) return queryClients(fetchImpl)
+  const fresh = options?.fresh === true
+  if (fetchImpl) return queryClients(fetchImpl, fresh)
+  if (fresh) return queryClients(defaultFetch, true)
   return cached('notion-clients', () => queryClients(defaultFetch))
 }
 

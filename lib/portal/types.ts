@@ -111,6 +111,12 @@ export interface PortalStore extends IngestStore {
   getClient(id: number): Promise<ClientRecord | null>
   createClient(input: ClientInput): Promise<ClientRecord>
   updateClient(id: number, input: ClientInput): Promise<ClientRecord>
+  /**
+   * Remove the roster row. Appointments stay and lose client_id (shoot history and
+   * needs-review rows remain). Briefs stay and lose client_id. Sessions, extra
+   * emails, and portal links go with the client.
+   */
+  deleteClient(id: number): Promise<void>
   updateRenewal(id: number, renewalDate: string): Promise<void>
   listAppointmentsForClient(clientId: number): Promise<AppointmentRecord[]>
   /** Every stored appointment, including unmatched and discovery calls. */

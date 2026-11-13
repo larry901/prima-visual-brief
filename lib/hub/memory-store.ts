@@ -220,6 +220,13 @@ export class MemoryHubStore implements HubStore {
     this.data.clientPrices.push([clientId, dollars(monthlyDollars) ?? 0])
   }
 
+  async releaseClient(clientId: number): Promise<void> {
+    this.data.clientPrices = this.data.clientPrices.filter(([id]) => id !== clientId)
+    for (const lead of this.data.leads) {
+      if (lead.convertedClientId === clientId) lead.convertedClientId = null
+    }
+  }
+
   async countRecentStaffLinks(email: string, sinceIso: string): Promise<number> {
     const norm = normalizeEmail(email)
     const since = new Date(sinceIso).getTime()

@@ -156,6 +156,12 @@ export interface HubStore {
   setPlanPrice(planSize: PlanSize, monthlyDollars: number | null): Promise<void>
   getClientPrices(): Promise<Map<number, number>>
   setClientPrice(clientId: number, monthlyDollars: number | null): Promise<void>
+  /**
+   * Drop the hub rows that point at a roster client that is about to be deleted.
+   * The price row is also removed by the clients foreign key. The converted-client
+   * pointer is not, so a deleted client must not keep a lead looking converted.
+   */
+  releaseClient(clientId: number): Promise<void>
   countRecentStaffLinks(email: string, sinceIso: string): Promise<number>
   createStaffMagicLink(email: string, tokenHash: string, expiresAt: string, now?: Date): Promise<void>
   consumeStaffMagicLink(tokenHash: string, nowIso: string): Promise<string | null>

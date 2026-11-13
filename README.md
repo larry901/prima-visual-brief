@@ -47,7 +47,7 @@ cp .env.local.example .env.local
 | `DASHBOARD_PASSWORD` | Yes | Password for `/dashboard`. The session cookie is signed with a key derived from this value, so changing it signs everyone out. The same value encrypts each client's personal portal link. After a change, the Clients page can't show an existing link until you reset it. A link a client already saved keeps working until that reset. |
 | `APP_URL` | No | Public origin used in magic-link emails. Production: `https://brief.primavisual.io`. When unset, the link uses the request host, which is what you want on preview URLs. |
 | `ACUITY_INGEST_TOKEN` | For ingest | Bearer token for `POST /api/ingest/acuity`. The route returns 401 until this is set. |
-| `WEBSITE_LEAD_TOKEN` | For website leads | Bearer token for `POST /api/ingest/website-lead`. Separate from the Acuity token. The route returns 401 until this is set. |
+| `WEBSITE_LEAD_TOKEN` | For website leads | Bearer token for `POST /api/ingest/website-lead`. The route also accepts `ACUITY_INGEST_TOKEN`. It returns 401 when neither is set. |
 | `STAFF_EMAILS` | For the hub | Comma-separated staff inboxes that can request a Prima Hub magic link. Do not commit real addresses. The dashboard password still opens the hub if this is unset. |
 | `PORTAL_DEMO_SEED` | No | Set to `true` locally or on a preview deployment to load fictional `@example.com` clients and to show their sign-in links on screen. Leave unset in production. |
 | `NOTION_TOKEN` | No | Read-only internal integration token for the Prima Visual Edit database. When set, a linked client sees Video progress on `/portal`, and Clients can pick a Notion page. When unset, or if Notion errors, that section is hidden. |
@@ -252,7 +252,7 @@ The appointment is stored so the hub can show it. It does not reduce shoots left
 
 ### Website form leads
 
-The marketing site is separate. Its server posts new form leads here. Do not call this from the browser. The token is `WEBSITE_LEAD_TOKEN`, not the Acuity token.
+The marketing site is on Squarespace, so its forms cannot send a bearer token. A bot reads the form-submission email and posts it here. Do not call this from the browser. Authorization is `Bearer` plus `WEBSITE_LEAD_TOKEN`, or the same bot's `ACUITY_INGEST_TOKEN`. Either secret is accepted when both are set. The route stays closed when neither is set.
 
 ```http
 POST /api/ingest/website-lead
@@ -269,7 +269,9 @@ Content-Type: application/json
   "message": "Looking at a one-time shoot.",
   "service_type": "project",
   "estimated_value": 6000,
-  "source": "Website form"
+  "source": "Website form",
+  "referral_source": "Friend",
+  "received_at": "2026-10-02T16:00:00.000Z"
 }
 ```
 
@@ -283,8 +285,10 @@ Content-Type: application/json
 | `service_type` | No | `subscription` or `project` |
 | `estimated_value` | No | Whole dollars |
 | `source` | No | Omit it, or send `Website form` |
+| `referral_source` | No | The form's "How did you hear about us?" answer. Source stays `Website form`. The answer is stored on the lead notes as `How they heard about us: …`. `Friend`, `referral`, or `referred` also fills Referred by when that field is still blank |
+| `received_at` | No | ISO timestamp of the submission. On a new lead this is `created_at` and the Chicago calendar day is the first follow-up. An open lead that already exists keeps its created time |
 
-A new lead is stage `New`, source `Website form`, and the follow-up date is today in America/Chicago so it shows on Today. An open lead with the same email is updated instead of duplicated. Won and lost leads are not reopened.
+A new lead is stage `New` and source `Website form`. With no `received_at`, the follow-up date is today in America/Chicago so it shows on Today. An open lead with the same email is updated instead of duplicated. Won and lost leads are not reopened.
 
 ```json
 { "ok": true, "lead_id": 8, "action": "created" }
@@ -306,7 +310,7 @@ The brief form's variables stay as they are. For the portal, add:
 | Name | Environments | Value |
 |---|---|---|
 | `ACUITY_INGEST_TOKEN` | Production, and Preview if the bot should hit a preview | A long random string. Give the same value to Crystal's bot. |
-| `WEBSITE_LEAD_TOKEN` | Production, and Preview if the website should hit a preview | A different long random string. Give it to the website server only. |
+| `WEBSITE_LEAD_TOKEN` | Production, and Preview if the website should hit a preview | Optional when the bot already has `ACUITY_INGEST_TOKEN`. Either bearer is accepted. |
 | `STAFF_EMAILS` | Production, and Preview if staff should sign in there | Comma-separated staff inboxes. Do not commit them. |
 | `APP_URL` | Production | `https://brief.primavisual.io` |
 | `PORTAL_DEMO_SEED` | Preview only, optional | `true` |
@@ -319,7 +323,7 @@ Staff open `/hub` on a phone. It installs as **Prima Hub** (manifest scope `/hub
 
 Sign-in is a magic link to an address in `STAFF_EMAILS`. The existing dashboard password session also opens the hub, and the dashboard itself is unchanged. Signing out of the hub also ends that dashboard session, because the password session is accepted as hub access. The hub does not email or text leads or clients. Suggested follow-up text is copied by staff and sent by them. Web push for due follow-ups is a later phase. The unused hook is `notifyDueFollowUps` in `lib/hub/push.ts`.
 
-Tabs: Today, Leads, Edits, Clients, KPIs. Edits read the same Notion Edit database as the portal and show internal statuses. Clients reuse the roster, cycle math, and shoot counts. Monthly subscription prices are entered by staff on KPIs (per plan) and Clients (per client). They are not read from Stripe.
+Tabs: Today, Leads, Edits, Clients, KPIs. Edits read the same Notion Edit database as the portal and show internal statuses. Refresh loads Notion again and skips the one-minute cache. Clients reuse the roster, cycle math, and shoot counts. Staff can edit a client, mark them inactive, or delete them from the hub. Inactive clients stay in a collapsed section, cannot sign in, and are left out of recurring revenue, renewals, and unused shoots. Deleting a client keeps their appointments and briefs and clears the link to the client, so shoot history and the needs-review queue stay put. Monthly subscription prices are entered by staff on KPIs (per plan) and on a client in the hub. They are not read from Stripe.
 
 KPIs that are approximate because the data is limited:
 

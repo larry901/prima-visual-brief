@@ -14,6 +14,14 @@ export const STAFF_STATUS_ORDER = [
   'Completed',
 ] as const
 
+export interface HubEditBoard {
+  configured: boolean
+  unavailable: boolean
+  usingSample: boolean
+  edits: StaffEdit[]
+  fetchedAt: string
+}
+
 export interface StaffEdit {
   id: string
   name: string

@@ -50,6 +50,7 @@ export function createFileStore(filePath: string): PortalStore {
     findClientByEmail: (email) => run((store) => store.findClientByEmail(email)),
     createClient: (input) => run((store) => store.createClient(input)),
     updateClient: (id, input) => run((store) => store.updateClient(id, input)),
+    deleteClient: (id) => run((store) => store.deleteClient(id)),
     updateRenewal: (id, renewalDate) => run((store) => store.updateRenewal(id, renewalDate)),
     findAppointmentByAcuityId: (id) => run((store) => store.findAppointmentByAcuityId(id)),
     findAppointmentByNaturalKey: (email, type, start) =>

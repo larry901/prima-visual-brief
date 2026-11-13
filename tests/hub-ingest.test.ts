@@ -196,7 +196,12 @@ describe('discovery call ingest', () => {
 describe('website lead ingest', () => {
   const token = 'website-token'
 
-  async function submit(body: unknown, authorization?: string, hub = new MemoryHubStore()) {
+  async function submit(
+    body: unknown,
+    authorization?: string,
+    hub = new MemoryHubStore(),
+    tokens: string | readonly (string | undefined)[] = token,
+  ) {
     const response = await handleWebsiteLead(
       new Request('https://brief.primavisual.io/api/ingest/website-lead', {
         method: 'POST',
@@ -207,7 +212,7 @@ describe('website lead ingest', () => {
         body: JSON.stringify(body),
       }),
       hub,
-      token,
+      tokens,
       NOW,
     )
     return { status: response.status, json: await response.json(), hub }
@@ -254,6 +259,121 @@ describe('website lead ingest', () => {
     const response = await submit({ name: 'Casey Ortiz' }, `Bearer ${token}`, hub)
     assert.equal(response.status, 400)
     assert.equal(hub.data.leads.length, 0)
+  })
+
+  it('accepts the website token or the acuity token', async () => {
+    const tokens = [token, 'acuity-token']
+    const hub = new MemoryHubStore()
+    const body = { name: 'Casey Ortiz', email: 'casey.ortiz@example.com' }
+    const missing = await submit(body, undefined, hub, tokens)
+    assert.equal(missing.status, 401)
+    const wrong = await submit(body, 'Bearer other-token', hub, tokens)
+    assert.equal(wrong.status, 401)
+    const closed = await submit(body, `Bearer ${token}`, new MemoryHubStore(), [undefined, ' '])
+    assert.equal(closed.status, 401)
+    const website = await submit(body, `Bearer ${token}`, hub, tokens)
+    assert.equal(website.status, 200)
+    assert.equal(website.json.action, 'created')
+    const acuity = await submit(
+      { name: 'Riley Cho', email: 'riley.cho@example.com' },
+      'Bearer acuity-token',
+      hub,
+      tokens,
+    )
+    assert.equal(acuity.status, 200)
+    assert.equal(acuity.json.action, 'created')
+    assert.equal(hub.data.leads.length, 2)
+  })
+
+  it('keeps source Website form and records how they heard about us', async () => {
+    const hub = new MemoryHubStore()
+    const friend = await submit(
+      {
+        name: 'Casey Ortiz',
+        email: 'casey.ortiz@example.com',
+        message: 'Looking at a one-time shoot.',
+        referral_source: 'Friend',
+      },
+      `Bearer ${token}`,
+      hub,
+    )
+    assert.equal(friend.status, 200)
+    assert.equal(hub.data.leads[0].source, 'Website form')
+    assert.equal(hub.data.leads[0].referredBy, 'Friend')
+    assert.match(hub.data.leads[0].notes, /How they heard about us: Friend/)
+    assert.match(hub.data.leads[0].notes, /Looking at a one-time shoot\./)
+
+    const google = await submit(
+      {
+        name: 'Riley Cho',
+        email: 'riley.cho@example.com',
+        referral_source: 'Google',
+      },
+      `Bearer ${token}`,
+      hub,
+    )
+    assert.equal(google.status, 200)
+    assert.equal(hub.data.leads[1].source, 'Website form')
+    assert.equal(hub.data.leads[1].referredBy, '')
+    assert.equal(hub.data.leads[1].notes, 'How they heard about us: Google')
+
+    const referred = await submit(
+      {
+        name: 'Avery Kim',
+        email: 'avery.kim@example.com',
+        referral_source: 'Referred by Sam Ortiz',
+      },
+      `Bearer ${token}`,
+      hub,
+    )
+    assert.equal(hub.data.leads[2].referredBy, 'Referred by Sam Ortiz')
+    assert.equal(hub.data.leads[2].source, 'Website form')
+  })
+
+  it('uses received_at as the created time and first follow-up, and does not move an existing lead', async () => {
+    const hub = new MemoryHubStore()
+    const received = '2026-10-02T16:00:00.000Z'
+    const created = await submit(
+      {
+        name: 'Casey Ortiz',
+        email: 'casey.ortiz@example.com',
+        received_at: received,
+      },
+      `Bearer ${token}`,
+      hub,
+    )
+    assert.equal(created.status, 200)
+    assert.equal(created.json.action, 'created')
+    assert.equal(hub.data.leads[0].createdAt, received)
+    assert.equal(hub.data.leads[0].nextFollowUp, '2026-10-02')
+    assert.equal(hub.data.events[0].at, received)
+
+    const again = await submit(
+      {
+        name: 'Casey Ortiz',
+        email: 'casey.ortiz@example.com',
+        received_at: '2026-09-01T16:00:00.000Z',
+      },
+      `Bearer ${token}`,
+      hub,
+    )
+    assert.equal(again.json.action, 'unchanged')
+    assert.equal(hub.data.leads[0].createdAt, received)
+    assert.equal(hub.data.leads[0].nextFollowUp, '2026-10-02')
+
+    const bad = await submit(
+      { name: 'Riley Cho', email: 'riley.cho@example.com', received_at: '2026-10-02' },
+      `Bearer ${token}`,
+      hub,
+    )
+    assert.equal(bad.status, 400)
+    const typed = await submit(
+      { name: 'Riley Cho', email: 'riley.cho@example.com', referral_source: 4 },
+      `Bearer ${token}`,
+      hub,
+    )
+    assert.equal(typed.status, 400)
+    assert.equal(hub.data.leads.length, 1)
   })
 })
 

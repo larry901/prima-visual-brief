@@ -156,6 +156,33 @@ export interface WebsiteLeadInput {
   serviceType: ServiceType | null
   estimatedValueDollars: number | null
   source: LeadSource
+  /** The form's "How did you hear about us?" answer. Empty when omitted. */
+  referralSource: string
+  /** Set when the answer is a friend or a referral. Source stays Website form. */
+  referredBy: string
+  /** Submission time for backfills. Null means "now". */
+  receivedAt: Date | null
+}
+
+const HEARD_ABOUT_PREFIX = 'How they heard about us: '
+
+export function heardAboutLine(referralSource: string): string {
+  return `${HEARD_ABOUT_PREFIX}${referralSource.trim()}`
+}
+
+/** Friend, referral, or "referred by…" — not a channel name like Google. */
+export function isReferralAnswer(value: string): boolean {
+  return /\b(friend|referral|referred)\b/i.test(value.trim())
+}
+
+function parseReceivedAt(value: unknown): { ok: true; value: Date | null } | { ok: false; error: string } {
+  if (value == null || value === '') return { ok: true, value: null }
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value.trim())) {
+    return { ok: false, error: 'received_at must be an ISO timestamp' }
+  }
+  const date = new Date(value.trim())
+  if (Number.isNaN(date.getTime())) return { ok: false, error: 'received_at must be an ISO timestamp' }
+  return { ok: true, value: date }
 }
 
 function cleanText(value: unknown, max: number): string | null {
@@ -206,6 +233,10 @@ export function parseWebsiteLead(body: unknown): { ok: true; value: WebsiteLeadI
     }
     source = record.source
   }
+  const referralSource = cleanText(record.referral_source, 200)
+  if (referralSource == null) return { ok: false, error: 'referral_source must be a string' }
+  const receivedAt = parseReceivedAt(record.received_at)
+  if (!receivedAt.ok) return receivedAt
   return {
     ok: true,
     value: {
@@ -217,6 +248,9 @@ export function parseWebsiteLead(body: unknown): { ok: true; value: WebsiteLeadI
       serviceType,
       estimatedValueDollars,
       source,
+      referralSource,
+      referredBy: referralSource && isReferralAnswer(referralSource) ? referralSource : '',
+      receivedAt: receivedAt.value,
     },
   }
 }
@@ -227,13 +261,23 @@ function appendNote(notes: string, message: string): string {
   return notes ? `${notes}\n${text}` : text
 }
 
-/** Create or refresh the open lead for one website-form submission. Matched by email. */
+function websiteNotes(message: string, referralSource: string): string {
+  const heard = referralSource ? heardAboutLine(referralSource) : ''
+  return [message.trim(), heard].filter(Boolean).join('\n')
+}
+
+/**
+ * Create or refresh the open lead for one website-form submission. Matched by email.
+ * `receivedAt` is the submission time: a new lead's created time and first follow-up
+ * day. A repeat for an open lead keeps the original created time.
+ */
 export async function applyWebsiteLead(
   input: WebsiteLeadInput,
   hub: HubStore,
   now: Date = new Date(),
 ): Promise<LeadWriteResult> {
-  const today = chicagoDate(now)
+  const occurred = input.receivedAt ?? now
+  const followUpDay = chicagoDate(occurred)
   const existing = openLeadByEmail(await hub.listLeads(), input.email)
   if (!existing) {
     const created = await hub.createLead(
@@ -243,30 +287,35 @@ export async function applyWebsiteLead(
         phone: input.phone,
         company: input.company,
         source: input.source,
+        referredBy: input.referredBy,
         stage: 'New',
         serviceType: input.serviceType,
         estimatedValueDollars: input.estimatedValueDollars,
-        notes: input.message,
-        nextFollowUp: today,
+        notes: websiteNotes(input.message, input.referralSource),
+        nextFollowUp: followUpDay,
       },
-      now,
+      occurred,
     )
     return { leadId: created.id, action: 'created' }
   }
-  const notes = appendNote(existing.notes, input.message)
+  let notes = appendNote(existing.notes, input.message)
+  if (input.referralSource) notes = appendNote(notes, heardAboutLine(input.referralSource))
+  const referredBy = input.referredBy ? fill(existing.referredBy, input.referredBy) : existing.referredBy
   const patch: LeadPatch = {
     name: fill(existing.name, input.name),
     phone: fill(existing.phone, input.phone),
     company: fill(existing.company, input.company),
+    referredBy,
     notes,
     serviceType: existing.serviceType ?? input.serviceType,
     estimatedValueDollars: existing.estimatedValueDollars ?? input.estimatedValueDollars,
-    nextFollowUp: existing.nextFollowUp ?? today,
+    nextFollowUp: existing.nextFollowUp ?? followUpDay,
   }
   if (
     patch.name === existing.name &&
     patch.phone === existing.phone &&
     patch.company === existing.company &&
+    patch.referredBy === existing.referredBy &&
     patch.notes === existing.notes &&
     patch.serviceType === existing.serviceType &&
     patch.estimatedValueDollars === existing.estimatedValueDollars &&
