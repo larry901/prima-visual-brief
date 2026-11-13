@@ -1,8 +1,9 @@
 import Link from 'next/link'
+import { Fragment } from 'react'
 import LeadActions from '../LeadActions'
 import { notifyDueFollowUps } from '@/lib/hub/push'
 import { suggestedFollowUpText } from '@/lib/hub/followups'
-import { buildTodayModel } from '@/lib/hub/today'
+import { buildTodayModel, orderTodaySections } from '@/lib/hub/today'
 import { requireHubPage } from '@/lib/hub/session'
 import { loadWorkspace } from '@/lib/hub/workspace'
 import { formatLongDate } from '@/lib/portal/cycle'
@@ -29,8 +30,78 @@ export default async function TodayPage() {
       <main>
         <p className="hub-kicker">Today</p>
         <h1>{formatLongDate(model.today)}</h1>
-        <p className="hub-date">Follow-ups, discovery calls, and shoots. Nothing here sends a message.</p>
+        <p className="hub-date">Shoots and discovery calls first, then follow-ups. An empty section drops to the bottom. Nothing here sends a message.</p>
 
+        {orderTodaySections([
+          {
+            id: 'shoots' as const,
+            populated: model.shootsToday.length + model.shootsLaterThisWeek.length > 0,
+            node: (
+        <section className="hub-section" aria-labelledby="shoots">
+          <h2 id="shoots">Shoots</h2>
+          {model.shootsToday.length === 0 && model.shootsLaterThisWeek.length === 0 ? (
+            <p className="hub-muted">No shoots left this week.</p>
+          ) : (
+            <ul className="hub-stack" style={{ marginTop: 12, padding: 0, listStyle: 'none' }}>
+              {model.shootsToday.map((shoot) => (
+                <li key={shoot.id} className="hub-card">
+                  <p className="hub-kicker">Today</p>
+                  <h2>{shoot.name}</h2>
+                  <p className="hub-note">
+                    {shoot.type} · {shoot.label}
+                  </p>
+                </li>
+              ))}
+              {model.shootsLaterThisWeek.map((shoot) => (
+                <li key={shoot.id} className="hub-card">
+                  <p className="hub-kicker">This week</p>
+                  <h2>{shoot.name}</h2>
+                  <p className="hub-note">
+                    {shoot.type} · {shoot.label}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+            ),
+          },
+          {
+            id: 'discoveries' as const,
+            populated: model.discoveries.length > 0,
+            node: (
+        <section className="hub-section" aria-labelledby="discoveries">
+          <h2 id="discoveries">Discovery calls</h2>
+          {model.discoveries.length === 0 ? (
+            <p className="hub-muted">No discovery calls in the next 14 days.</p>
+          ) : (
+            <ul className="hub-stack" style={{ marginTop: 12, padding: 0, listStyle: 'none' }}>
+              {model.discoveries.map((call) => (
+                <li key={call.key} className="hub-card">
+                  <div className="hub-card-top">
+                    <h2>
+                      {call.leadId ? (
+                        <Link className="hub-link" href={`/hub/leads/${call.leadId}`}>
+                          {call.name}
+                        </Link>
+                      ) : (
+                        call.name
+                      )}
+                    </h2>
+                    <p className="hub-muted">{call.status}</p>
+                  </div>
+                  <p className="hub-note">{call.label}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+            ),
+          },
+          {
+            id: 'followUps' as const,
+            populated: model.followUps.length > 0,
+            node: (
         <section className="hub-section" aria-labelledby="follow-ups">
           <h2 id="follow-ups">Follow-ups</h2>
           {model.followUps.length === 0 ? (
@@ -59,6 +130,9 @@ export default async function TodayPage() {
                       stage={lead.stage}
                       lostReason={lead.lostReason}
                       suggestion={suggestedFollowUpText(lead)}
+                      estimatedValueDollars={lead.estimatedValueDollars}
+                      serviceType={lead.serviceType}
+                      today={model.today}
                     />
                   </article>
                 )
@@ -66,61 +140,11 @@ export default async function TodayPage() {
             </div>
           )}
         </section>
-
-        <section className="hub-section" aria-labelledby="discoveries">
-          <h2 id="discoveries">Discovery calls</h2>
-          {model.discoveries.length === 0 ? (
-            <p className="hub-muted">No discovery calls in the next 14 days.</p>
-          ) : (
-            <ul className="hub-stack" style={{ marginTop: 12, padding: 0, listStyle: 'none' }}>
-              {model.discoveries.map((call) => (
-                <li key={call.key} className="hub-card">
-                  <div className="hub-card-top">
-                    <h2>
-                      {call.leadId ? (
-                        <Link className="hub-link" href={`/hub/leads/${call.leadId}`}>
-                          {call.name}
-                        </Link>
-                      ) : (
-                        call.name
-                      )}
-                    </h2>
-                    <p className="hub-muted">{call.status}</p>
-                  </div>
-                  <p className="hub-note">{call.label}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <section className="hub-section" aria-labelledby="shoots">
-          <h2 id="shoots">Shoots</h2>
-          {model.shootsToday.length === 0 && model.shootsLaterThisWeek.length === 0 ? (
-            <p className="hub-muted">No shoots left this week.</p>
-          ) : (
-            <ul className="hub-stack" style={{ marginTop: 12, padding: 0, listStyle: 'none' }}>
-              {model.shootsToday.map((shoot) => (
-                <li key={shoot.id} className="hub-card">
-                  <p className="hub-kicker">Today</p>
-                  <h2>{shoot.name}</h2>
-                  <p className="hub-note">
-                    {shoot.type} · {shoot.label}
-                  </p>
-                </li>
-              ))}
-              {model.shootsLaterThisWeek.map((shoot) => (
-                <li key={shoot.id} className="hub-card">
-                  <p className="hub-kicker">This week</p>
-                  <h2>{shoot.name}</h2>
-                  <p className="hub-note">
-                    {shoot.type} · {shoot.label}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+            ),
+          },
+        ]).map((section) => (
+          <Fragment key={section.id}>{section.node}</Fragment>
+        ))}
       </main>
     )
   } catch (error) {

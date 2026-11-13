@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { followUpState, isFollowUpDue, selectDueFollowUps, snoozeFollowUp, suggestedFollowUpText } from '../lib/hub/followups'
 import { notifyDueFollowUps, setFollowUpPushSender } from '../lib/hub/push'
-import { buildTodayModel } from '../lib/hub/today'
+import { buildTodayModel, orderTodaySections } from '../lib/hub/today'
 import type { LeadRecord } from '../lib/hub/types'
 import type { AppointmentRecord } from '../lib/portal/types'
 
@@ -159,6 +159,25 @@ describe('today model', () => {
     assert.equal(
       model.shootsToday.concat(model.shootsLaterThisWeek).some((shoot) => shoot.type === 'Discovery Call'),
       false,
+    )
+  })
+
+  it('puts empty sections after shoots, discovery calls, and follow-ups', () => {
+    assert.deepEqual(
+      orderTodaySections([
+        { id: 'followUps', populated: true },
+        { id: 'discoveries', populated: false },
+        { id: 'shoots', populated: true },
+      ]).map((section) => section.id),
+      ['shoots', 'followUps', 'discoveries'],
+    )
+    assert.deepEqual(
+      orderTodaySections([
+        { id: 'followUps', populated: false },
+        { id: 'discoveries', populated: false },
+        { id: 'shoots', populated: false },
+      ]).map((section) => section.id),
+      ['shoots', 'discoveries', 'followUps'],
     )
   })
 })

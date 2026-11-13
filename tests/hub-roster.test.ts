@@ -68,6 +68,15 @@ describe('inactive roster', () => {
       3,
     )
   })
+
+  it('keeps per-client fields such as the portal link when grouping', () => {
+    const groups = partitionClients([
+      { ...card({ id: 1, name: 'Maya Chen', kind: 'subscription', active: true }), portalUrl: 'https://example.com/portal/c/token' },
+      { ...card({ id: 2, name: 'Priya Nair', kind: 'subscription', active: false }), portalUrl: null },
+    ])
+    assert.equal(groups.subscribers[0]?.portalUrl, 'https://example.com/portal/c/token')
+    assert.equal(groups.inactive[0]?.portalUrl, null)
+  })
 })
 
 describe('delete roster client', () => {

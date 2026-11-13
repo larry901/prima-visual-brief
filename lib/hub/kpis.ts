@@ -62,10 +62,22 @@ export interface KpiReport {
   month: string
   wonThisMonthDollars: number
   wonThisMonthCount: number
+  /** Active subscription prices only. Inactive clients are left out. */
+  activeRecurringDollars: number
+  /** Subscription deals won this month. Their value is monthly, so it is new MRR. */
+  newMrrDollars: number
+  /** Active subscription prices plus new MRR from subscription deals won this month. */
   recurringDollars: number
+  /** One-off deals won this month. One-off projects and won deals are the same entry. */
+  oneOffDollars: number
   projectWonThisMonthDollars: number
   subscriptionWonThisMonthDollars: number
-  /** Won deals this month plus current recurring prices. The Stripe seam is this sum. */
+  /** Recurring plus one-off. The Stripe seam is this sum. */
+  totalDollars: number
+  /** Lead wins this month plus deals logged only on KPIs. */
+  dealsWonCount: number
+  /** Leads marked won this month divided by leads marked won or lost this month. */
+  winRate: number | null
   revenueTowardTarget: number
   targetLow: number
   targetHigh: number
@@ -213,6 +225,12 @@ export function shootsOnDates(
   }).length
 }
 
+export interface KpiDirectDeal {
+  serviceType: ServiceType
+  amountDollars: number
+  wonOn: string
+}
+
 export interface KpiInput {
   leads: readonly KpiLead[]
   events: readonly KpiStageEvent[]
@@ -221,14 +239,15 @@ export interface KpiInput {
   appointments: readonly ShootAppointment[]
   countedTypes: readonly string[]
   edits: readonly KpiEdit[]
+  /** Deals logged on KPIs that were never leads. */
+  directDeals?: readonly KpiDirectDeal[]
 }
 
 /**
  * Monthly revenue toward the target.
- * `recurringDollars` is staff-entered until Stripe is connected. A later phase
- * should fill `subscribers[].monthlyDollars` from the active Stripe subscription
- * item, and `wonThisMonthDollars` from collected invoices in the Chicago month.
- * This function is that seam. It does not call Stripe.
+ * Recurring is staff-entered active subscription prices plus subscription deals
+ * won this month (new MRR). One-off revenue is one-off deals won this month.
+ * A later phase should fill active prices from Stripe. This function does not.
  */
 export function computeKpis(input: KpiInput): KpiReport {
   const month = input.today.slice(0, 7)
@@ -236,6 +255,11 @@ export function computeKpis(input: KpiInput): KpiReport {
   let wonThisMonthCount = 0
   let projectWonThisMonthDollars = 0
   let subscriptionWonThisMonthDollars = 0
+  let newMrrDollars = 0
+  let oneOffDollars = 0
+  let dealsWonCount = 0
+  let wonLeadsThisMonth = 0
+  let lostLeadsThisMonth = 0
   const wonValues: number[] = []
   let wonDealsAtLeast5k = 0
   let openDealsAtLeast5k = 0
@@ -249,15 +273,38 @@ export function computeKpis(input: KpiInput): KpiReport {
     if (lead.stage !== 'Won' && lead.stage !== 'Lost' && value != null && value >= 5_000) {
       openDealsAtLeast5k += 1
     }
+    if (lead.stage === 'Lost') {
+      const losses = input.events
+        .filter((event) => event.leadId === lead.id && event.toStage === 'Lost')
+        .map((event) => event.at)
+        .sort()
+      const lostAt = losses[losses.length - 1]
+      if (lostAt && chicagoMonth(lostAt) === month) lostLeadsThisMonth += 1
+    }
     const at = wonAt(lead, input.events)
-    if (!at || chicagoMonth(at) !== month || value == null) continue
+    if (!at || chicagoMonth(at) !== month) continue
+    dealsWonCount += 1
+    wonLeadsThisMonth += 1
+    if (value == null) continue
     wonThisMonthDollars += value
     wonThisMonthCount += 1
-    if (lead.serviceType === 'subscription') subscriptionWonThisMonthDollars += value
-    else projectWonThisMonthDollars += value
+    if (lead.serviceType === 'subscription') {
+      subscriptionWonThisMonthDollars += value
+      newMrrDollars += value
+    } else if (lead.serviceType === 'project') {
+      projectWonThisMonthDollars += value
+      oneOffDollars += value
+    }
   }
 
-  let recurringDollars = 0
+  for (const deal of input.directDeals ?? []) {
+    if (!isIsoDate(deal.wonOn) || deal.wonOn.slice(0, 7) !== month) continue
+    dealsWonCount += 1
+    if (deal.serviceType === 'subscription') newMrrDollars += deal.amountDollars
+    else if (deal.serviceType === 'project') oneOffDollars += deal.amountDollars
+  }
+
+  let activeRecurringDollars = 0
   let unpricedSubscribers = 0
   let renewalsSoon = 0
   let inactiveSubscribers = 0
@@ -268,12 +315,18 @@ export function computeKpis(input: KpiInput): KpiReport {
       continue
     }
     if (subscriber.monthlyDollars == null) unpricedSubscribers += 1
-    else recurringDollars += subscriber.monthlyDollars
+    else activeRecurringDollars += subscriber.monthlyDollars
     if (subscriber.renewalSoon) renewalsSoon += 1
     unusedShoots += Math.max(0, subscriber.remaining)
   }
 
-  const revenueTowardTarget = wonThisMonthDollars + recurringDollars
+  const recurringDollars = activeRecurringDollars + newMrrDollars
+  const totalDollars = recurringDollars + oneOffDollars
+  const winRate =
+    wonLeadsThisMonth + lostLeadsThisMonth === 0
+      ? null
+      : wonLeadsThisMonth / (wonLeadsThisMonth + lostLeadsThisMonth)
+  const revenueTowardTarget = totalDollars
   const targetBand =
     revenueTowardTarget < REVENUE_TARGET.low ? 'below' : revenueTowardTarget > REVENUE_TARGET.high ? 'above' : 'inside'
 
@@ -313,9 +366,15 @@ export function computeKpis(input: KpiInput): KpiReport {
     month,
     wonThisMonthDollars,
     wonThisMonthCount,
+    activeRecurringDollars,
+    newMrrDollars,
     recurringDollars,
+    oneOffDollars,
     projectWonThisMonthDollars,
     subscriptionWonThisMonthDollars,
+    totalDollars,
+    dealsWonCount,
+    winRate,
     revenueTowardTarget,
     targetLow: REVENUE_TARGET.low,
     targetHigh: REVENUE_TARGET.high,
@@ -339,8 +398,9 @@ export function computeKpis(input: KpiInput): KpiReport {
     shootsPriorWeeks,
     averageShootsPerWeek: weekCounts.reduce((sum, count) => sum + count, 0) / weekCounts.length,
     approximateNotes: [
-      'Revenue adds estimated values of deals marked Won this month to staff-entered monthly prices. It is not cash collected. A new subscriber can be counted twice in the same month if the deal value and the monthly price are both filled in.',
-      'Stripe is a later phase. Plug subscription amounts into the monthly price fields, and collected invoices into won-this-month, at computeKpis in lib/hub/kpis.ts.',
+      'Recurring revenue is active subscription prices plus subscription deals won this month. Those deals are new MRR. Inactive clients are left out. A subscription deal and a client price for the same person can both be counted until Stripe replaces the staff-entered prices.',
+      'One-off revenue is one-off deals won this month. Logging a won deal is the only way a project enters that number. Stripe is a later phase.',
+      'Win rate is leads marked won this month divided by leads marked won or lost this month. A deal logged only on KPIs counts in revenue and deals won, not in the rate.',
       'Conversion uses stage changes stored in the hub. Leads from before this install are not backfilled. A deal marked Won counts as having reached discovery.',
       'Edit turnaround is the average of Notion Date Shot to Completed Date on rows whose status is Completed or Approved. Revision rate only sees the current status, so a video that was revised and then completed is not counted.',
       'Subscriber churn is the share of subscription clients marked inactive. There is no cancellation date.',

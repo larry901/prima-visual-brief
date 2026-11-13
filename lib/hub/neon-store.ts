@@ -16,10 +16,12 @@ import {
   type LeadStage,
   type NewLead,
   type NewTouch,
+  type NewWonDeal,
   type ServiceType,
   type StageEvent,
   type TouchRecord,
   type DiscoveryStatus,
+  type WonDealRecord,
 } from './types'
 
 function sqlClient() {
@@ -109,6 +111,17 @@ function mapLead(row: LeadRow): LeadRecord {
     createdAt: asIso(row.created_at),
     updatedAt: asIso(row.updated_at),
   }
+}
+
+function isoDay(value: string | Date): string {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    const year = value.getUTCFullYear()
+    const month = String(value.getUTCMonth() + 1).padStart(2, '0')
+    const day = String(value.getUTCDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10)
+  return ''
 }
 
 function requireDollars(value: number | null | undefined): number | null {
@@ -212,6 +225,16 @@ export function createNeonHubStore(): HubStore {
         token_hash TEXT PRIMARY KEY,
         email TEXT NOT NULL,
         expires_at TIMESTAMPTZ NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `
+    await sql`
+      CREATE TABLE IF NOT EXISTS hub_won_deals (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        service_type TEXT NOT NULL,
+        amount_dollars INTEGER NOT NULL CHECK (amount_dollars >= 0),
+        won_on DATE NOT NULL,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `
@@ -436,6 +459,69 @@ export function createNeonHubStore(): HubStore {
         monthly_dollars: number
       }[]
       return new Map(rows.map((row) => [Number(row.client_id), Number(row.monthly_dollars)]))
+    },
+
+    async listWonDeals() {
+      await ensureReady()
+      const sql = sqlClient()
+      const rows = (await sql`
+        SELECT id, name, service_type, amount_dollars, won_on, created_at
+        FROM hub_won_deals
+        ORDER BY won_on DESC, id DESC
+      `) as {
+        id: number
+        name: string
+        service_type: string
+        amount_dollars: number
+        won_on: string | Date
+        created_at: string | Date
+      }[]
+      return rows.flatMap((row) => {
+        if (!isServiceType(row.service_type)) return []
+        const wonOn = isoDay(row.won_on)
+        if (!wonOn) return []
+        return [
+          {
+            id: Number(row.id),
+            name: row.name,
+            serviceType: row.service_type,
+            amountDollars: Number(row.amount_dollars),
+            wonOn,
+            createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
+          } satisfies WonDealRecord,
+        ]
+      })
+    },
+
+    async createWonDeal(input: NewWonDeal, now: Date = new Date()) {
+      await ensureReady()
+      const name = input.name.trim()
+      if (!name) throw new Error('Name is required')
+      if (!isServiceType(input.serviceType)) throw new Error('Type must be a one-off project or a subscription')
+      const amount = requireDollars(input.amountDollars)
+      if (amount == null) throw new Error('Amount is required')
+      const sql = sqlClient()
+      const rows = await sql`
+        INSERT INTO hub_won_deals (name, service_type, amount_dollars, won_on, created_at)
+        VALUES (${name}, ${input.serviceType}, ${amount}, ${input.wonOn}, ${now.toISOString()})
+        RETURNING id, name, service_type, amount_dollars, won_on, created_at
+      `
+      const row = rows[0] as {
+        id: number
+        name: string
+        service_type: ServiceType
+        amount_dollars: number
+        won_on: string | Date
+        created_at: string | Date
+      }
+      return {
+        id: Number(row.id),
+        name: row.name,
+        serviceType: row.service_type,
+        amountDollars: Number(row.amount_dollars),
+        wonOn: isoDay(row.won_on) || input.wonOn,
+        createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
+      } satisfies WonDealRecord
     },
 
     async releaseClient(clientId) {

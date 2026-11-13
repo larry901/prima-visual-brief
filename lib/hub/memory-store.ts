@@ -12,8 +12,10 @@ import {
   type LeadRecord,
   type NewLead,
   type NewTouch,
+  type NewWonDeal,
   type StageEvent,
   type TouchRecord,
+  type WonDealRecord,
 } from './types'
 
 interface MagicLinkRow {
@@ -39,7 +41,8 @@ export interface MemoryHubData {
   clientPrices: [number, number][]
   magicLinks: MagicLinkRow[]
   sessions: SessionRow[]
-  seq: { lead: number; event: number; touch: number; magic: number }
+  wonDeals: WonDealRecord[]
+  seq: { lead: number; event: number; touch: number; magic: number; deal: number }
 }
 
 export function emptyHubData(): MemoryHubData {
@@ -51,7 +54,8 @@ export function emptyHubData(): MemoryHubData {
     clientPrices: [],
     magicLinks: [],
     sessions: [],
-    seq: { lead: 1, event: 1, touch: 1, magic: 1 },
+    wonDeals: [],
+    seq: { lead: 1, event: 1, touch: 1, magic: 1, deal: 1 },
   }
 }
 
@@ -87,7 +91,9 @@ export class MemoryHubStore implements HubStore {
 
   constructor(data: MemoryHubData = emptyHubData()) {
     this.data = data
-    if (!this.data.seq) this.data.seq = { lead: 1, event: 1, touch: 1, magic: 1 }
+    if (!this.data.seq) this.data.seq = { lead: 1, event: 1, touch: 1, magic: 1, deal: 1 }
+    if (this.data.seq.deal == null) this.data.seq.deal = 1
+    if (!Array.isArray(this.data.wonDeals)) this.data.wonDeals = []
     this.data.leads = (this.data.leads ?? []).map((lead) => ({
       ...lead,
       source: isLeadSource(lead.source) ? lead.source : 'Other',
@@ -218,6 +224,27 @@ export class MemoryHubStore implements HubStore {
     this.data.clientPrices = this.data.clientPrices.filter(([id]) => id !== clientId)
     if (monthlyDollars == null) return
     this.data.clientPrices.push([clientId, dollars(monthlyDollars) ?? 0])
+  }
+
+  async listWonDeals(): Promise<WonDealRecord[]> {
+    return [...this.data.wonDeals].sort((a, b) => b.wonOn.localeCompare(a.wonOn) || b.id - a.id)
+  }
+
+  async createWonDeal(input: NewWonDeal, now: Date = new Date()): Promise<WonDealRecord> {
+    const name = input.name.trim()
+    if (!name) throw new Error('Name is required')
+    if (!isServiceType(input.serviceType)) throw new Error('Type must be a one-off project or a subscription')
+    const deal: WonDealRecord = {
+      id: this.data.seq.deal++,
+      name,
+      serviceType: input.serviceType,
+      amountDollars: dollars(input.amountDollars) ?? 0,
+      wonOn: input.wonOn,
+      createdAt: now.toISOString(),
+    }
+    if (deal.amountDollars == null) throw new Error('Amount is required')
+    this.data.wonDeals.push(deal)
+    return deal
   }
 
   async releaseClient(clientId: number): Promise<void> {

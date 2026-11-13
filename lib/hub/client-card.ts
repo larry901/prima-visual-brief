@@ -22,14 +22,14 @@ export interface HubClientCard {
 }
 
 /** Active subscribers and projects stay in their lists. Inactive clients are separate. */
-export function partitionClients(cards: readonly HubClientCard[]): {
-  subscribers: HubClientCard[]
-  projects: HubClientCard[]
-  inactive: HubClientCard[]
+export function partitionClients<T extends HubClientCard>(cards: readonly T[]): {
+  subscribers: T[]
+  projects: T[]
+  inactive: T[]
 } {
-  const subscribers: HubClientCard[] = []
-  const projects: HubClientCard[] = []
-  const inactive: HubClientCard[] = []
+  const subscribers: T[] = []
+  const projects: T[] = []
+  const inactive: T[] = []
   for (const client of cards) {
     if (!client.active) inactive.push(client)
     else if (client.kind === 'subscription') subscribers.push(client)

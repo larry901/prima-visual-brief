@@ -61,6 +61,7 @@ function snap(overrides: Partial<NotionEditSnapshot> = {}): NotionEditSnapshot {
     dueOn: '2026-11-16',
     dueText: null,
     completedOn: null,
+    lastEditedAt: null,
     ...overrides,
   }
 }

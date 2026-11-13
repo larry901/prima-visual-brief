@@ -2,7 +2,8 @@
 
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import type { LeadStage, TouchKind } from '@/lib/hub/types'
+import LogWonDeal from './LogWonDeal'
+import type { LeadStage, ServiceType, TouchKind } from '@/lib/hub/types'
 import { LEAD_STAGES } from '@/lib/hub/types'
 
 const TOUCHES: { kind: TouchKind; label: string }[] = [
@@ -17,11 +18,17 @@ export default function LeadActions({
   stage,
   lostReason,
   suggestion,
+  estimatedValueDollars,
+  serviceType,
+  today,
 }: {
   leadId: number
   stage: LeadStage
   lostReason: string
   suggestion: string
+  estimatedValueDollars?: number | null
+  serviceType?: ServiceType | null
+  today: string
 }) {
   const router = useRouter()
   const [note, setNote] = useState('')
@@ -30,6 +37,7 @@ export default function LeadActions({
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [pending, setPending] = useState(false)
+  const [winning, setWinning] = useState(false)
 
   async function send(url: string, body: unknown) {
     setPending(true)
@@ -134,7 +142,7 @@ export default function LeadActions({
         </button>
       </form>
       <div className="hub-actions" aria-label="Stage">
-        {LEAD_STAGES.filter((item) => item !== 'Lost').map((item) => (
+        {LEAD_STAGES.filter((item) => item !== 'Lost' && item !== 'Won').map((item) => (
           <button
             key={item}
             type="button"
@@ -148,7 +156,25 @@ export default function LeadActions({
             {item}
           </button>
         ))}
+        <button
+          type="button"
+          className="hub-chip"
+          aria-pressed={stage === 'Won' || winning}
+          disabled={pending}
+          onClick={() => setWinning((open) => !open)}
+        >
+          Log won deal
+        </button>
       </div>
+      {winning && (
+        <LogWonDeal
+          leadId={leadId}
+          initialAmount={estimatedValueDollars}
+          initialType={serviceType}
+          today={today}
+          onDone={() => setWinning(false)}
+        />
+      )}
       <form
         className="hub-stack"
         onSubmit={(event) => {

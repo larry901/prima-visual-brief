@@ -1,3 +1,4 @@
+import LogWonDeal from '../../LogWonDeal'
 import PriceField from '../../PriceField'
 import { computeKpis } from '@/lib/hub/kpis'
 import { requireHubPage } from '@/lib/hub/session'
@@ -22,10 +23,12 @@ export default async function KpisPage() {
     shotOn: edit.shotOn,
     completedOn: edit.completedOn,
   }))
+  const today = chicagoToday(workspace.now)
+  const directDeals = await workspace.hub.listWonDeals()
   const report = computeKpis({
     leads: workspace.leads,
     events: workspace.events,
-    today: chicagoToday(workspace.now),
+    today,
     subscribers: cards
       .filter((client) => client.kind === 'subscription')
       .map((client) => ({
@@ -37,13 +40,14 @@ export default async function KpisPage() {
     appointments: workspace.appointments,
     countedTypes: workspace.countedTypes,
     edits,
+    directDeals,
   })
   const width = Math.min(100, report.targetHigh === 0 ? 0 : (report.revenueTowardTarget / report.targetHigh) * 100)
   const tick = (report.targetLow / report.targetHigh) * 100
   return (
     <main>
-      <p className="hub-kicker">This month</p>
-      <h1>{formatDollars(report.revenueTowardTarget)}</h1>
+      <p className="hub-kicker">Total this month</p>
+      <h1>{formatDollars(report.totalDollars)}</h1>
       <p className="hub-date">
         Target {formatDollars(report.targetLow)}–{formatDollars(report.targetHigh)}. Band: {report.targetBand}.
       </p>
@@ -55,18 +59,37 @@ export default async function KpisPage() {
         <article className="hub-card">
           <p className="hub-kicker">Recurring</p>
           <p className="hub-stat">{formatDollars(report.recurringDollars)}</p>
-          <p className="hub-muted">{report.unpricedSubscribers} subscribers have no price</p>
+          <p className="hub-muted">
+            Active clients {formatDollars(report.activeRecurringDollars)} · new MRR {formatDollars(report.newMrrDollars)}.
+            Inactive clients are excluded. {report.unpricedSubscribers} subscribers have no price.
+          </p>
         </article>
         <article className="hub-card">
-          <p className="hub-kicker">Won deals</p>
-          <p className="hub-stat">{formatDollars(report.wonThisMonthDollars)}</p>
-          <p className="hub-muted">{report.wonThisMonthCount} this month</p>
+          <p className="hub-kicker">One-off</p>
+          <p className="hub-stat">{formatDollars(report.oneOffDollars)}</p>
+          <p className="hub-muted">Won one-off deals this month</p>
+        </article>
+        <article className="hub-card">
+          <p className="hub-kicker">Deals won</p>
+          <p className="hub-stat">{report.dealsWonCount}</p>
+          <p className="hub-muted">Leads and deals logged on this page</p>
+        </article>
+        <article className="hub-card">
+          <p className="hub-kicker">Win rate</p>
+          <p className="hub-stat">{formatPercent(report.winRate)}</p>
+          <p className="hub-muted">Leads marked won or lost this month</p>
         </article>
       </div>
-      <p className="hub-muted" style={{ marginTop: 8 }}>
-        Project won {formatDollars(report.projectWonThisMonthDollars)} · subscription deals won{' '}
-        {formatDollars(report.subscriptionWonThisMonthDollars)}
-      </p>
+
+      <section className="hub-section">
+        <h2>Log won deal</h2>
+        <p className="hub-muted">
+          Use this for a deal that never was a lead. On a lead, use Log won deal there. One-off and subscription are the two types.
+        </p>
+        <div style={{ marginTop: 12 }}>
+          <LogWonDeal today={today} />
+        </div>
+      </section>
 
       <section className="hub-section">
         <h2>Plan prices</h2>

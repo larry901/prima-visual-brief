@@ -1,10 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import AddClientForm from './AddClientForm'
+import { copyText } from '@/lib/copy-text'
 import { partitionClients, type HubClientCard } from '@/lib/hub/client-card'
 import { formatDollars } from '@/lib/hub/money'
 import type { ClientKind, PlanSize } from '@/lib/portal/types'
+
+type RosterClient = HubClientCard & { portalUrl: string | null }
 
 interface Draft {
   name: string
@@ -20,7 +24,7 @@ interface Draft {
   monthlyPrice: string
 }
 
-function draftFrom(client: HubClientCard): Draft {
+function draftFrom(client: RosterClient): Draft {
   return {
     name: client.name,
     email: client.email,
@@ -36,7 +40,7 @@ function draftFrom(client: HubClientCard): Draft {
   }
 }
 
-function rosterBody(client: HubClientCard, active: boolean) {
+function rosterBody(client: RosterClient, active: boolean) {
   return {
     name: client.name,
     email: client.email,
@@ -57,16 +61,17 @@ async function readError(response: Response, fallback: string): Promise<string> 
   return data && typeof data.error === 'string' ? data.error : fallback
 }
 
-export default function ClientRoster({ clients }: { clients: HubClientCard[] }) {
+export default function ClientRoster({ clients }: { clients: RosterClient[] }) {
   const router = useRouter()
   const { subscribers, projects, inactive } = partitionClients(clients)
   const unused = subscribers.reduce((sum, client) => sum + client.remaining, 0)
   const [inactiveOpen, setInactiveOpen] = useState(false)
+  const [adding, setAdding] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [pendingId, setPendingId] = useState<number | null>(null)
   const [error, setError] = useState<{ id: number; message: string } | null>(null)
 
-  const setActive = async (client: HubClientCard, active: boolean) => {
+  const setActive = async (client: RosterClient, active: boolean) => {
     setPendingId(client.id)
     setError(null)
     try {
@@ -89,7 +94,7 @@ export default function ClientRoster({ clients }: { clients: HubClientCard[] }) 
     }
   }
 
-  const save = async (client: HubClientCard, draft: Draft) => {
+  const save = async (client: RosterClient, draft: Draft) => {
     const price = draft.kind === 'subscription' ? parseMonthly(draft.monthlyPrice) : null
     if (price === 'bad') throw new Error('Monthly price must be a dollar amount from 0 to 1,000,000.')
     const response = await fetch(`/api/dashboard/clients/${client.id}`, {
@@ -122,7 +127,7 @@ export default function ClientRoster({ clients }: { clients: HubClientCard[] }) 
     router.refresh()
   }
 
-  const remove = async (client: HubClientCard, confirmName: string) => {
+  const remove = async (client: RosterClient, confirmName: string) => {
     setPendingId(client.id)
     setError(null)
     try {
@@ -146,7 +151,7 @@ export default function ClientRoster({ clients }: { clients: HubClientCard[] }) 
     }
   }
 
-  const renderCard = (client: HubClientCard) => (
+  const renderCard = (client: RosterClient) => (
     <ClientCard
       key={client.id}
       client={client}
@@ -166,7 +171,19 @@ export default function ClientRoster({ clients }: { clients: HubClientCard[] }) 
   return (
     <>
       <p className="hub-kicker">Roster</p>
-      <h1>Clients</h1>
+      <div className="hub-card-top">
+        <h1>Clients</h1>
+      </div>
+      <button className="hub-btn hub-btn-block" type="button" onClick={() => setAdding((open) => !open)}>
+        {adding ? 'Close' : 'Add client'}
+      </button>
+      {adding && (
+        <AddClientForm
+          onCreated={() => {
+            setAdding(false)
+          }}
+        />
+      )}
       <p className="hub-date">
         {unused} unused subscription shoot{unused === 1 ? '' : 's'} this cycle. Renewals in the next 14 days are marked.
         Inactive clients are left out of revenue, subscriber counts, renewals, and unused shoots.
@@ -235,7 +252,7 @@ function ClientCard({
   onSave,
   onDelete,
 }: {
-  client: HubClientCard
+  client: RosterClient
   editing: boolean
   pending: boolean
   error: string | null
@@ -244,7 +261,6 @@ function ClientCard({
   onSave: (draft: Draft) => Promise<void>
   onDelete: (confirmName: string) => Promise<boolean>
 }) {
-  const [confirming, setConfirming] = useState(false)
   return (
     <li className={client.renewalSoon ? 'hub-card hub-soon' : 'hub-card'}>
       <div className="hub-card-top">
@@ -267,67 +283,140 @@ function ClientCard({
           </p>
         </>
       )}
-      <div className="hub-actions">
-        <button
-          className="hub-btn"
-          type="button"
-          onClick={() => {
-            setConfirming(false)
-            onEdit()
-          }}
-          disabled={pending}
-        >
-          {editing ? 'Close' : 'Edit'}
-        </button>
-        <button className="hub-btn hub-btn-ghost" type="button" onClick={() => onToggle(!client.active)} disabled={pending}>
-          {pending ? 'Saving…' : client.active ? 'Mark inactive' : 'Mark active'}
-        </button>
-        <button
-          className="hub-btn hub-btn-danger"
-          type="button"
-          onClick={() => {
-            if (editing) onEdit()
-            setConfirming((open) => !open)
-          }}
-          disabled={pending}
-        >
-          {confirming ? 'Close' : 'Delete'}
-        </button>
-      </div>
-      {error && !editing && !confirming && <p className="hub-error">{error}</p>}
-      {editing && <ClientEditor client={client} pending={pending} onSave={onSave} />}
-      {confirming && (
-        <DeleteDialog
+      <CopyLinkButton
+        clientId={client.id}
+        name={client.name}
+        url={client.portalUrl}
+        editing={editing}
+        pending={pending}
+        onEdit={onEdit}
+      />
+      {!client.active && (
+        <p className="hub-muted">Inactive — this link won&apos;t sign anyone in until the client is active again.</p>
+      )}
+      {editing && (
+        <ClientEditor
           client={client}
           pending={pending}
           error={error}
-          onCancel={() => setConfirming(false)}
-          onInactive={() => onToggle(false)}
-          onDelete={async (name) => {
-            const gone = await onDelete(name)
-            if (gone) setConfirming(false)
-          }}
+          onSave={onSave}
+          onToggle={onToggle}
+          onDelete={onDelete}
         />
       )}
     </li>
   )
 }
 
+function CopyLinkButton({
+  clientId,
+  name,
+  url,
+  editing,
+  pending,
+  onEdit,
+}: {
+  clientId: number
+  name: string
+  url: string | null
+  editing: boolean
+  pending: boolean
+  onEdit: () => void
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [copied, setCopied] = useState(false)
+  const [fallback, setFallback] = useState(false)
+
+  useEffect(() => {
+    if (!copied) return
+    const id = window.setTimeout(() => setCopied(false), 2000)
+    return () => window.clearTimeout(id)
+  }, [copied])
+
+  useEffect(() => {
+    if (!fallback) return
+    inputRef.current?.focus()
+    inputRef.current?.select()
+  }, [fallback])
+
+  const copy = async () => {
+    if (!url) return
+    const wrote = await copyText(url)
+    if (wrote) {
+      setCopied(true)
+      setFallback(false)
+      return
+    }
+    setCopied(false)
+    setFallback(true)
+    window.requestAnimationFrame(() => {
+      inputRef.current?.focus()
+      inputRef.current?.select()
+    })
+  }
+
+  return (
+    <div className="hub-stack">
+      <div className="hub-actions hub-actions-equal">
+        <button className="hub-btn" type="button" onClick={onEdit} disabled={pending}>
+          {editing ? 'Close' : 'Edit'}
+        </button>
+        <button
+          className="hub-btn hub-btn-ghost"
+          type="button"
+          onClick={() => {
+            void copy()
+          }}
+          disabled={!url}
+          aria-label={`Copy portal link for ${name}`}
+        >
+          <span aria-live="polite">{copied ? 'Copied' : 'Copy link'}</span>
+        </button>
+      </div>
+      {!url && <p className="hub-muted">This portal link can&apos;t be shown right now.</p>}
+      {fallback && url && (
+        <label className="hub-label" htmlFor={`portal-link-${clientId}`}>
+          Select the link and copy it
+          <input
+            ref={inputRef}
+            id={`portal-link-${clientId}`}
+            className="hub-input"
+            readOnly
+            spellCheck={false}
+            autoComplete="off"
+            value={url}
+            onFocus={(event) => event.currentTarget.select()}
+          />
+        </label>
+      )}
+    </div>
+  )
+}
+
 function ClientEditor({
   client,
   pending,
+  error: actionError,
   onSave,
+  onToggle,
+  onDelete,
 }: {
-  client: HubClientCard
+  client: RosterClient
   pending: boolean
+  error: string | null
   onSave: (draft: Draft) => Promise<void>
+  onToggle: (active: boolean) => void
+  onDelete: (confirmName: string) => Promise<boolean>
 }) {
   const [form, setForm] = useState<Draft>(draftFrom(client))
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [confirming, setConfirming] = useState(false)
   const set = (patch: Partial<Draft>) => setForm((current) => ({ ...current, ...patch }))
+  const busy = saving || pending
 
   return (
+    <div className="hub-stack">
     <form
       className="hub-stack"
       onSubmit={async (event) => {
@@ -508,10 +597,43 @@ function ClientEditor({
         />
       </label>
       {error && <p className="hub-error">{error}</p>}
-      <button className="hub-btn hub-btn-block" type="submit" disabled={saving || pending}>
+      <button className="hub-btn hub-btn-block" type="submit" disabled={busy}>
         {saving ? 'Saving…' : 'Save client'}
       </button>
     </form>
+    <div className="hub-danger-zone">
+      <p className="hub-muted">
+        Inactive keeps {client.name} on the roster. They cannot sign in, and they drop out of revenue and renewals.
+        Delete removes them. Their shoots and briefs stay, with the client cleared.
+      </p>
+      <button className="hub-btn hub-btn-ghost hub-btn-block" type="button" onClick={() => onToggle(!client.active)} disabled={busy}>
+        {pending ? 'Saving…' : client.active ? 'Mark inactive' : 'Mark active'}
+      </button>
+      {!confirming && actionError && <p className="hub-error">{actionError}</p>}
+      {confirming ? (
+        <DeleteDialog
+          client={client}
+          pending={pending}
+          error={actionError}
+          onCancel={() => setConfirming(false)}
+          onInactive={() => onToggle(false)}
+          onDelete={async (name) => {
+            const gone = await onDelete(name)
+            if (gone) setConfirming(false)
+          }}
+        />
+      ) : (
+        <button
+          className="hub-btn hub-btn-danger-solid hub-btn-block"
+          type="button"
+          onClick={() => setConfirming(true)}
+          disabled={busy}
+        >
+          Delete
+        </button>
+      )}
+    </div>
+    </div>
   )
 }
 
@@ -523,7 +645,7 @@ function DeleteDialog({
   onInactive,
   onDelete,
 }: {
-  client: HubClientCard
+  client: RosterClient
   pending: boolean
   error: string | null
   onCancel: () => void
@@ -567,14 +689,12 @@ function DeleteDialog({
         />
       </label>
       {error && <p className="hub-error">{error}</p>}
-      <div className="hub-actions">
-        <button className="hub-btn hub-btn-danger" type="submit" disabled={!matches || pending}>
-          {pending ? 'Deleting…' : 'Delete client'}
-        </button>
-        <button className="hub-btn hub-btn-ghost" type="button" onClick={onCancel} disabled={pending}>
-          Cancel
-        </button>
-      </div>
+      <button className="hub-btn hub-btn-ghost hub-btn-block" type="button" onClick={onCancel} disabled={pending}>
+        Cancel
+      </button>
+      <button className="hub-btn hub-btn-danger-solid hub-btn-block" type="submit" disabled={!matches || pending}>
+        {pending ? 'Deleting…' : 'Delete client'}
+      </button>
     </form>
   )
 }

@@ -43,6 +43,18 @@ export interface TodayModel {
 
 const DISCOVERY_HORIZON_DAYS = 14
 
+export const TODAY_SECTION_ORDER = ['shoots', 'discoveries', 'followUps'] as const
+export type TodaySectionId = (typeof TODAY_SECTION_ORDER)[number]
+
+/** Populated sections stay in shoots, calls, then follow-ups. Empty sections drop to the bottom. */
+export function orderTodaySections<T extends { id: TodaySectionId; populated: boolean }>(sections: readonly T[]): T[] {
+  const rank = new Map(TODAY_SECTION_ORDER.map((id, index) => [id, index]))
+  return [...sections].sort((a, b) => {
+    if (a.populated !== b.populated) return a.populated ? -1 : 1
+    return (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0)
+  })
+}
+
 function slotKey(email: string, startAt: string): string {
   return `slot:${email.trim().toLowerCase()}|${new Date(startAt).getTime()}`
 }

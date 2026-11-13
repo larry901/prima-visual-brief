@@ -51,6 +51,9 @@ export default async function LeadPage({ params }: { params: { id: string } }) {
             stage={lead.stage}
             lostReason={lead.lostReason}
             suggestion={suggestedFollowUpText(lead)}
+            estimatedValueDollars={lead.estimatedValueDollars}
+            serviceType={lead.serviceType}
+            today={today}
           />
         </div>
       </section>
