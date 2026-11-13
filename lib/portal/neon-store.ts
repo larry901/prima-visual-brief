@@ -577,6 +577,20 @@ export function createNeonStore(): PortalStore {
       }
     },
 
+    async deleteClient(id) {
+      await ensureReady()
+      const sql = sqlClient()
+      const existing = await sql`SELECT id FROM clients WHERE id = ${id} LIMIT 1`
+      if (!existing[0]) return false
+      const briefs = (await sql`SELECT to_regclass('public.briefs') AS name`) as { name: string | null }[]
+      if (briefs[0]?.name) {
+        await sql`UPDATE briefs SET client_id = NULL WHERE client_id = ${id}`
+      }
+      // ON DELETE SET NULL keeps appointment rows. CASCADE removes emails, sessions, and links.
+      await sql`DELETE FROM clients WHERE id = ${id}`
+      return true
+    },
+
     async updateRenewal(id, renewalDate) {
       await ensureReady()
       const sql = sqlClient()

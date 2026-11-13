@@ -47,7 +47,7 @@ cp .env.local.example .env.local
 | `DASHBOARD_PASSWORD` | Yes | Password for `/dashboard`. The session cookie is signed with a key derived from this value, so changing it signs everyone out. The same value encrypts each client's personal portal link. After a change, the Clients page can't show an existing link until you reset it. A link a client already saved keeps working until that reset. |
 | `APP_URL` | No | Public origin used in magic-link emails. Production: `https://brief.primavisual.io`. When unset, the link uses the request host, which is what you want on preview URLs. |
 | `ACUITY_INGEST_TOKEN` | For ingest | Bearer token for `POST /api/ingest/acuity`. The route returns 401 until this is set. |
-| `WEBSITE_LEAD_TOKEN` | For website leads | Bearer token for `POST /api/ingest/website-lead`. Separate from the Acuity token. The route returns 401 until this is set. |
+| `WEBSITE_LEAD_TOKEN` | For website leads | Optional bearer for `POST /api/ingest/website-lead`. `ACUITY_INGEST_TOKEN` is also accepted, so the Gmail bot can post Squarespace form emails with the token it already has. The route returns 401 until one of the two is set. |
 | `STAFF_EMAILS` | For the hub | Comma-separated staff inboxes that can request a Prima Hub magic link. Do not commit real addresses. The dashboard password still opens the hub if this is unset. |
 | `PORTAL_DEMO_SEED` | No | Set to `true` locally or on a preview deployment to load fictional `@example.com` clients and to show their sign-in links on screen. Leave unset in production. |
 | `NOTION_TOKEN` | No | Read-only internal integration token for the Prima Visual Edit database. When set, a linked client sees Video progress on `/portal`, and Clients can pick a Notion page. When unset, or if Notion errors, that section is hidden. |
@@ -252,7 +252,7 @@ The appointment is stored so the hub can show it. It does not reduce shoots left
 
 ### Website form leads
 
-The marketing site is separate. Its server posts new form leads here. Do not call this from the browser. The token is `WEBSITE_LEAD_TOKEN`, not the Acuity token.
+The marketing site is on Squarespace, so the form itself cannot send a bearer header. The same outside bot that reads Acuity mail reads the Squarespace form-submission emails and POSTs them here. `WEBSITE_LEAD_TOKEN` still works. `ACUITY_INGEST_TOKEN` is also accepted, because that bot already has it. Either bearer is enough. The response does not say which one matched. Do not call this from the browser.
 
 ```http
 POST /api/ingest/website-lead
@@ -306,7 +306,7 @@ The brief form's variables stay as they are. For the portal, add:
 | Name | Environments | Value |
 |---|---|---|
 | `ACUITY_INGEST_TOKEN` | Production, and Preview if the bot should hit a preview | A long random string. Give the same value to Crystal's bot. |
-| `WEBSITE_LEAD_TOKEN` | Production, and Preview if the website should hit a preview | A different long random string. Give it to the website server only. |
+| `WEBSITE_LEAD_TOKEN` | Production, and Preview if you want a separate website token | Optional. The Acuity ingest token is enough for the Squarespace email bot. |
 | `STAFF_EMAILS` | Production, and Preview if staff should sign in there | Comma-separated staff inboxes. Do not commit them. |
 | `APP_URL` | Production | `https://brief.primavisual.io` |
 | `PORTAL_DEMO_SEED` | Preview only, optional | `true` |

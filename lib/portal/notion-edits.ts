@@ -53,7 +53,19 @@ function notionApiBase(): string {
   return raw.replace(/\/$/, '')
 }
 
-const defaultFetch: NotionFetch = (input, init) => fetch(input, init)
+const defaultFetch: NotionFetch = (input, init) => {
+  if (!process.env.NEXT_RUNTIME) {
+    const { next: _next, ...rest } = init
+    return fetch(input, rest)
+  }
+  return fetch(input, init)
+}
+
+/** Skips the Next.js data cache. Used by the staff Refresh button. */
+const freshFetch: NotionFetch = (input, init) => {
+  const { next: _next, ...rest } = init
+  return fetch(input, { ...rest, cache: 'no-store' })
+}
 
 async function cached<T>(key: string, load: () => Promise<T>): Promise<T> {
   const hit = cache.get(key)
@@ -168,20 +180,37 @@ async function queryClients(fetchImpl: NotionFetch): Promise<{ id: string; name:
   return clients
 }
 
+export interface StaffEditBoard {
+  edits: StaffEdit[]
+  /** When this board was read from Notion, including a cached read. */
+  fetchedAt: string
+}
+
+async function readStaffEditBoard(fetchImpl: NotionFetch): Promise<StaffEditBoard> {
+  const [pages, clients] = await Promise.all([queryAllEdits(fetchImpl), listNotionClients(fetchImpl)])
+  const names = new Map(clients.map((client) => [client.id, client.name]))
+  return {
+    edits: pages.map((page) => staffEditFromSnapshot(page, names)),
+    fetchedAt: new Date().toISOString(),
+  }
+}
+
 /**
  * Every row in the Edit database, for staff. Internal statuses are included.
  * Null when Notion is not configured or the request failed.
+ * `fresh` drops the in-memory cache and skips the Next.js data cache.
  */
-export async function loadStaffEditBoard(fetchImpl?: NotionFetch): Promise<StaffEdit[] | null> {
+export async function loadStaffEditBoard(options: { fresh?: boolean; fetchImpl?: NotionFetch } = {}): Promise<StaffEditBoard | null> {
   if (!notionConfigured()) return null
   try {
-    const loadPages = () => queryAllEdits(fetchImpl ?? defaultFetch)
-    const [pages, clients] = await Promise.all([
-      fetchImpl ? loadPages() : cached('edits:all', loadPages),
-      listNotionClients(fetchImpl),
-    ])
-    const names = new Map(clients.map((client) => [client.id, client.name]))
-    return pages.map((page) => staffEditFromSnapshot(page, names))
+    if (options.fetchImpl) return readStaffEditBoard(options.fetchImpl)
+    if (options.fresh) {
+      clearNotionCache()
+      const board = await readStaffEditBoard(freshFetch)
+      cache.set('staff-edits', { expires: Date.now() + CACHE_MS, value: board })
+      return board
+    }
+    return cached('staff-edits', () => readStaffEditBoard(defaultFetch))
   } catch (error) {
     console.error('Staff edits unavailable', error instanceof Error ? error.message : 'error')
     return null

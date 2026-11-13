@@ -590,3 +590,15 @@ body:has(.hub-root) {
 }
 .hub-row { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
 .hub-filters { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+.hub-loading { opacity: 0.55; }
+.hub-card summary {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-family: Montserrat, Inter, sans-serif;
+  font-weight: 700;
+}
+.hub-fold { margin-top: 8px; }
+summary.hub-chip { width: fit-content; list-style: none; }
+summary.hub-chip::-webkit-details-marker { display: none; }

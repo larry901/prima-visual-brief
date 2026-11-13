@@ -196,7 +196,12 @@ describe('discovery call ingest', () => {
 describe('website lead ingest', () => {
   const token = 'website-token'
 
-  async function submit(body: unknown, authorization?: string, hub = new MemoryHubStore()) {
+  async function submit(
+    body: unknown,
+    authorization?: string,
+    hub = new MemoryHubStore(),
+    tokens: { website?: string; acuity?: string } = { website: token },
+  ) {
     const response = await handleWebsiteLead(
       new Request('https://brief.primavisual.io/api/ingest/website-lead', {
         method: 'POST',
@@ -207,7 +212,7 @@ describe('website lead ingest', () => {
         body: JSON.stringify(body),
       }),
       hub,
-      token,
+      tokens,
       NOW,
     )
     return { status: response.status, json: await response.json(), hub }
@@ -247,6 +252,33 @@ describe('website lead ingest', () => {
     )
     assert.equal(again.json.action, 'unchanged')
     assert.equal(hub.data.leads.length, 1)
+  })
+
+  it('accepts the Acuity ingest token as well as the website token', async () => {
+    const payload = { name: 'Casey Ortiz', email: 'casey.ortiz@example.com', message: 'From the Squarespace form.' }
+    const neither = await submit(payload, 'Bearer acuity-token', new MemoryHubStore(), {})
+    assert.equal(neither.status, 401)
+    const acuityOnly = await submit(payload, 'Bearer acuity-token', new MemoryHubStore(), { acuity: 'acuity-token' })
+    assert.equal(acuityOnly.status, 200)
+    assert.equal(acuityOnly.json.action, 'created')
+    const shared = new MemoryHubStore()
+    const withAcuity = await submit(payload, 'Bearer acuity-token', shared, {
+      website: 'website-token',
+      acuity: 'acuity-token',
+    })
+    assert.equal(withAcuity.status, 200)
+    const withWebsite = await submit(payload, 'Bearer website-token', shared, {
+      website: 'website-token',
+      acuity: 'acuity-token',
+    })
+    assert.equal(withWebsite.status, 200)
+    assert.equal(withWebsite.json.action, 'unchanged')
+    const wrong = await submit(payload, 'Bearer someone-else', shared, {
+      website: 'website-token',
+      acuity: 'acuity-token',
+    })
+    assert.equal(wrong.status, 401)
+    assert.equal(shared.data.leads.length, 1)
   })
 
   it('rejects a payload without an email', async () => {

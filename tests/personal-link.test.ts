@@ -73,7 +73,8 @@ describe('personal portal links', () => {
       assert.equal(JSON.stringify(store.data).includes(token), false)
       assert.equal(openPersonalToken(row.tokenCipher, SECRET), token)
       assert.equal(openPersonalToken(row.tokenCipher, 'different-test-secret'), null)
-      const flipped = row.tokenCipher.slice(0, -1) + (row.tokenCipher.endsWith('a') ? 'b' : 'a')
+      // Flip the first character. The last base64url character can be unused padding bits, so changing it does not always change the ciphertext.
+      const flipped = (row.tokenCipher.startsWith('A') ? 'B' : 'A') + row.tokenCipher.slice(1)
       assert.equal(openPersonalToken(flipped, SECRET), null)
       assert.notEqual(sealPersonalToken(token, SECRET), sealPersonalToken(token, SECRET))
 
