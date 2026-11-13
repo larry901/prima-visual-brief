@@ -501,7 +501,21 @@ body:has(.hub-root) {
   color: #f2c1c1;
   border: 1px solid rgba(242, 193, 193, 0.55);
 }
+.hub-btn-danger-solid {
+  background: #8a3a3a;
+  color: #ffffff;
+  border: 1px solid #f2c1c1;
+}
 .hub-btn-block { width: 100%; }
+.hub-actions-equal { flex-wrap: nowrap; }
+.hub-actions-equal > .hub-btn { flex: 1 1 0; min-width: 0; }
+.hub-danger-zone {
+  display: grid;
+  gap: 12px;
+  margin-top: 4px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(242, 193, 193, 0.45);
+}
 .hub-chip {
   min-height: 44px;
   padding: 10px 12px;

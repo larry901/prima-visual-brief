@@ -1,8 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { groupStaffEdits, type HubEditBoard, type StaffEdit } from '@/lib/hub/edits'
-import { formatLongDate, isIsoDate } from '@/lib/portal/cycle'
+import { filterStaffEdits, groupStaffEdits, SENT_FOR_APPROVAL, type HubEditBoard, type StaffEdit } from '@/lib/hub/edits'
+import { chicagoToday, formatLongDate, isIsoDate } from '@/lib/portal/cycle'
 
 function dateLabel(value: string | null): string | null {
   if (!value) return null
@@ -90,7 +90,7 @@ export default function EditsBoard({ initial }: { initial: HubEditBoard }) {
     }
   }, [refresh])
 
-  const groups = groupStaffEdits(board.edits)
+  const groups = groupStaffEdits(filterStaffEdits(board.edits, chicagoToday()))
   const canRefresh = board.configured || board.usingSample
   const stamp = updatedLabel(board.fetchedAt)
 
@@ -115,6 +115,9 @@ export default function EditsBoard({ initial }: { initial: HubEditBoard }) {
         </p>
       )}
       {error && <p className="hub-error">{error}</p>}
+      <p className="hub-muted">
+        {SENT_FOR_APPROVAL} shows videos last edited in Notion in the last 30 days. Notion does not store when the status changed.
+      </p>
       {board.usingSample && (
         <p className="hub-date">Sample board. Set NOTION_TOKEN to load the Edit database. These rows are not real jobs.</p>
       )}

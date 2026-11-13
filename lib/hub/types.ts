@@ -137,6 +137,24 @@ export interface TouchRecord {
   at: string
 }
 
+/** A deal logged on KPIs that never lived as a lead. Lead wins stay on the lead. */
+export interface WonDealRecord {
+  id: number
+  name: string
+  serviceType: ServiceType
+  amountDollars: number
+  /** Chicago calendar date the deal was won (YYYY-MM-DD). */
+  wonOn: string
+  createdAt: string
+}
+
+export interface NewWonDeal {
+  name: string
+  serviceType: ServiceType
+  amountDollars: number
+  wonOn: string
+}
+
 export interface NewTouch {
   leadId: number
   kind: TouchKind
@@ -152,6 +170,8 @@ export interface HubStore {
   listStageEvents(leadId?: number): Promise<StageEvent[]>
   addTouch(input: NewTouch, now?: Date): Promise<TouchRecord>
   listTouches(leadId?: number): Promise<TouchRecord[]>
+  listWonDeals(): Promise<WonDealRecord[]>
+  createWonDeal(input: NewWonDeal, now?: Date): Promise<WonDealRecord>
   getPlanPrices(): Promise<Partial<Record<PlanSize, number>>>
   setPlanPrice(planSize: PlanSize, monthlyDollars: number | null): Promise<void>
   getClientPrices(): Promise<Map<number, number>>

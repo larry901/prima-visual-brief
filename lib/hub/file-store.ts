@@ -49,6 +49,8 @@ export function createFileHubStore(filePath: string): HubStore {
     listStageEvents: (leadId) => run((store) => store.listStageEvents(leadId)),
     addTouch: (input, now) => run((store) => store.addTouch(input, now)),
     listTouches: (leadId) => run((store) => store.listTouches(leadId)),
+    listWonDeals: () => run((store) => store.listWonDeals()),
+    createWonDeal: (input, now) => run((store) => store.createWonDeal(input, now)),
     getPlanPrices: () => run((store) => store.getPlanPrices()),
     setPlanPrice: (planSize, monthlyDollars) => run((store) => store.setPlanPrice(planSize, monthlyDollars)),
     getClientPrices: () => run((store) => store.getClientPrices()),

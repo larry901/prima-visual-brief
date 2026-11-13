@@ -75,7 +75,13 @@ describe('conversion math', () => {
     assert.equal(report.wonThisMonthCount, 1)
     assert.equal(report.subscriptionWonThisMonthDollars, 8000)
     assert.equal(report.projectWonThisMonthDollars, 0)
-    assert.equal(report.recurringDollars, 5000)
+    assert.equal(report.activeRecurringDollars, 5000)
+    assert.equal(report.newMrrDollars, 8000)
+    assert.equal(report.oneOffDollars, 0)
+    assert.equal(report.recurringDollars, 13000)
+    assert.equal(report.totalDollars, 13000)
+    assert.equal(report.dealsWonCount, 1)
+    assert.equal(report.winRate, 0.5)
     assert.equal(report.revenueTowardTarget, 13000)
     assert.equal(report.targetBand, 'below')
     assert.equal(report.unpricedSubscribers, 1)
@@ -94,6 +100,51 @@ describe('conversion math', () => {
     assert.equal(report.unusedShoots, 3)
     assert.equal(report.shootsThisWeek, 1)
     assert.equal(weekStartMonday(TODAY), '2026-11-09')
+  })
+
+  it('adds one-off deals and subscription deals as new MRR, and leaves inactive prices out', () => {
+    const report = computeKpis({
+      leads: [
+        lead({
+          id: 1,
+          source: 'Referral',
+          stage: 'Won',
+          serviceType: 'project',
+          estimatedValueDollars: 4000,
+        }),
+        lead({
+          id: 2,
+          source: 'Website form',
+          stage: 'Lost',
+          serviceType: 'project',
+          estimatedValueDollars: 1000,
+        }),
+      ],
+      events: [
+        { leadId: 1, toStage: 'Won', at: '2026-11-02T15:00:00.000Z' },
+        { leadId: 2, toStage: 'Lost', at: '2026-11-04T15:00:00.000Z' },
+      ],
+      today: TODAY,
+      subscribers: [
+        { active: true, monthlyDollars: 2000, remaining: 1, renewalSoon: false },
+        { active: false, monthlyDollars: 9000, remaining: 0, renewalSoon: false },
+      ],
+      appointments: [],
+      countedTypes: [],
+      edits: [],
+      directDeals: [
+        { serviceType: 'project', amountDollars: 1500, wonOn: '2026-11-10' },
+        { serviceType: 'subscription', amountDollars: 700, wonOn: '2026-11-11' },
+        { serviceType: 'project', amountDollars: 9000, wonOn: '2026-10-02' },
+      ],
+    })
+    assert.equal(report.oneOffDollars, 5500)
+    assert.equal(report.newMrrDollars, 700)
+    assert.equal(report.activeRecurringDollars, 2000)
+    assert.equal(report.recurringDollars, 2700)
+    assert.equal(report.totalDollars, 8200)
+    assert.equal(report.dealsWonCount, 3)
+    assert.equal(report.winRate, 0.5)
   })
 
   it('treats edit metrics as a current-status sample', () => {

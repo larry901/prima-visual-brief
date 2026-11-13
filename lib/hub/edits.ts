@@ -1,4 +1,4 @@
-import { isIsoDate } from '../portal/cycle'
+import { addDays, chicagoDate, isIsoDate } from '../portal/cycle'
 import { calendarDaysBetween, type NotionEditSnapshot } from '../portal/video-progress'
 import { parseNotionPageId } from '../portal/notion-id'
 
@@ -22,6 +22,10 @@ export interface HubEditBoard {
   fetchedAt: string
 }
 
+export const SENT_FOR_APPROVAL = 'Sent for Approval'
+/** Inclusive Chicago calendar window. Notion has no status-changed date, so this uses last edited time. */
+export const SENT_FOR_APPROVAL_DAYS = 30
+
 export interface StaffEdit {
   id: string
   name: string
@@ -32,6 +36,7 @@ export interface StaffEdit {
   completedOn: string | null
   turnaroundDays: number | null
   notionUrl: string
+  lastEditedAt: string | null
 }
 
 export function notionPageUrl(pageId: string): string {
@@ -71,7 +76,26 @@ export function staffEditFromSnapshot(
     completedOn: page.completedOn,
     turnaroundDays,
     notionUrl: notionPageUrl(page.id),
+    lastEditedAt: page.lastEditedAt,
   }
+}
+
+/**
+ * Sent for Approval keeps videos whose Notion page was last edited within the window.
+ * The Edit database stores Status, Date Shot, Client Due Date, and Completed Date.
+ * It does not store when the status changed, so last_edited_time is the date we have.
+ * A row with no last-edited time is left out of that group. Every other status stays.
+ */
+export function filterStaffEdits(edits: readonly StaffEdit[], today: string): StaffEdit[] {
+  const cutoff = addDays(today, -SENT_FOR_APPROVAL_DAYS)
+  return edits.filter((edit) => {
+    if (edit.status !== SENT_FOR_APPROVAL) return true
+    if (!edit.lastEditedAt) return false
+    const parsed = new Date(edit.lastEditedAt)
+    if (Number.isNaN(parsed.getTime())) return false
+    const day = chicagoDate(parsed)
+    return isIsoDate(day) && day >= cutoff
+  })
 }
 
 export function groupStaffEdits(edits: readonly StaffEdit[]): { status: string; edits: StaffEdit[] }[] {
@@ -94,7 +118,7 @@ export function groupStaffEdits(edits: readonly StaffEdit[]): { status: string; 
 }
 
 /** Sample board for local demo when Notion is not connected. Not used in production. */
-export function sampleStaffEdits(): StaffEdit[] {
+export function sampleStaffEdits(now: Date = new Date()): StaffEdit[] {
   const page = (id: string) => notionPageUrl(id)
   return [
     {
@@ -107,6 +131,7 @@ export function sampleStaffEdits(): StaffEdit[] {
       completedOn: null,
       turnaroundDays: null,
       notionUrl: page('sample-queue'),
+      lastEditedAt: null,
     },
     {
       id: 'sample-edit',
@@ -118,6 +143,7 @@ export function sampleStaffEdits(): StaffEdit[] {
       completedOn: null,
       turnaroundDays: null,
       notionUrl: page('sample-edit'),
+      lastEditedAt: null,
     },
     {
       id: 'sample-internal',
@@ -129,6 +155,7 @@ export function sampleStaffEdits(): StaffEdit[] {
       completedOn: null,
       turnaroundDays: null,
       notionUrl: page('sample-internal'),
+      lastEditedAt: null,
     },
     {
       id: 'sample-revision',
@@ -140,6 +167,7 @@ export function sampleStaffEdits(): StaffEdit[] {
       completedOn: null,
       turnaroundDays: null,
       notionUrl: page('sample-revision'),
+      lastEditedAt: null,
     },
     {
       id: 'sample-done',
@@ -151,6 +179,31 @@ export function sampleStaffEdits(): StaffEdit[] {
       completedOn: '2026-10-27',
       turnaroundDays: 7,
       notionUrl: page('sample-done'),
+      lastEditedAt: null,
+    },
+    {
+      id: 'sample-approval',
+      name: '22 Sample Ave',
+      status: 'Sent for Approval',
+      clientName: 'Maya Chen',
+      shotOn: '2026-11-08',
+      dueLabel: '2026-11-20',
+      completedOn: null,
+      turnaroundDays: null,
+      notionUrl: page('sample-approval'),
+      lastEditedAt: new Date(now.getTime() - 3 * 86_400_000).toISOString(),
+    },
+    {
+      id: 'sample-approval-old',
+      name: '4 Old Review Rd',
+      status: 'Sent for Approval',
+      clientName: 'Andre Walsh',
+      shotOn: '2026-08-01',
+      dueLabel: null,
+      completedOn: null,
+      turnaroundDays: null,
+      notionUrl: page('sample-approval-old'),
+      lastEditedAt: new Date(now.getTime() - 45 * 86_400_000).toISOString(),
     },
   ]
 }

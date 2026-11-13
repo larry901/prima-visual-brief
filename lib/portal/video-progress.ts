@@ -168,6 +168,8 @@ export interface NotionEditSnapshot {
   dueOn: string | null
   dueText: string | null
   completedOn: string | null
+  /** Notion page last_edited_time. The database has no status-changed property. */
+  lastEditedAt: string | null
 }
 
 export interface VideoProgressItem {
@@ -327,5 +329,13 @@ export function snapshotFromNotionPage(page: unknown): NotionEditSnapshot | null
     shotOn: readDateStart(properties['Date Shot']),
     ...readDue(properties['Client Due Date']),
     completedOn: readDateStart(properties['Completed Date']),
+    lastEditedAt: readInstant(record.last_edited_time),
   }
+}
+
+function readInstant(value: unknown): string | null {
+  if (typeof value !== 'string' || !value.trim()) return null
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return null
+  return parsed.toISOString()
 }

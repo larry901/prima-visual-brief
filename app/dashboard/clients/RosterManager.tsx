@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { useRouter } from 'next/navigation'
+import { copyText } from '@/lib/copy-text'
 import {
   ROSTER_VIEW_OPTIONS,
   countClientsByRosterView,
@@ -394,6 +395,7 @@ function PersonalLinkControls({
   active: boolean
 }) {
   const router = useRouter()
+  const linkRef = useRef<HTMLInputElement>(null)
   const [url, setUrl] = useState(initialUrl)
   const [seenUrl, setSeenUrl] = useState(initialUrl)
   const [copied, setCopied] = useState(false)
@@ -414,14 +416,16 @@ function PersonalLinkControls({
 
   const copy = async () => {
     if (!url) return
-    try {
-      await navigator.clipboard.writeText(url)
+    const wrote = await copyText(url)
+    if (wrote) {
       setCopied(true)
       setNotice(null)
-    } catch {
-      setCopied(false)
-      setNotice('Select the link and copy it.')
+      return
     }
+    setCopied(false)
+    setNotice('Select the link and copy it.')
+    linkRef.current?.focus()
+    linkRef.current?.select()
   }
 
   const reset = async () => {
@@ -457,6 +461,7 @@ function PersonalLinkControls({
       {url ? (
         <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
           <input
+            ref={linkRef}
             id={`personal-link-${clientId}`}
             aria-labelledby={`personal-link-label-${clientId}`}
             className="input font-mono text-xs"
