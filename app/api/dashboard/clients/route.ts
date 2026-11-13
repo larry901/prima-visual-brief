@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { isAuthenticated } from '@/lib/auth'
+import { hubDenied, requireHubStaff } from '@/lib/hub/guard'
 import { attachClientEmails, parseClientInput } from '@/lib/portal/clients'
 import { ensurePersonalLink } from '@/lib/portal/personal-link'
 import { getPortalStore } from '@/lib/portal/store'
@@ -7,7 +7,8 @@ import { getPortalStore } from '@/lib/portal/store'
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: Request) {
-  if (!(await isAuthenticated())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const staff = await requireHubStaff()
+  if (hubDenied(staff)) return staff
   const parsed = parseClientInput(await request.json().catch(() => null))
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 })
   try {

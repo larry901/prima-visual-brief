@@ -266,6 +266,13 @@ export async function updateBriefRecord(id: number, patch: BriefUpdate): Promise
   return rows[0] ? mapBriefRow(rows[0] as Record<string, unknown>) : null
 }
 
+/** Keep the brief. Clear the client pointer so pages do not look up a deleted client. */
+export async function releaseBriefsForClient(clientId: number): Promise<void> {
+  await ensureTable()
+  const sql = getSql()
+  await sql`UPDATE briefs SET client_id = NULL WHERE client_id = ${clientId}`
+}
+
 export async function getAllBriefs(): Promise<BriefRow[]> {
   await ensureTable()
   const sql = getSql()

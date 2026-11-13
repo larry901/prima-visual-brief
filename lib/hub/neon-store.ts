@@ -438,6 +438,17 @@ export function createNeonHubStore(): HubStore {
       return new Map(rows.map((row) => [Number(row.client_id), Number(row.monthly_dollars)]))
     },
 
+    async releaseClient(clientId) {
+      await ensureReady()
+      const sql = sqlClient()
+      await sql`DELETE FROM hub_client_prices WHERE client_id = ${clientId}`
+      await sql`
+        UPDATE leads
+        SET converted_client_id = NULL
+        WHERE converted_client_id = ${clientId}
+      `
+    },
+
     async setClientPrice(clientId, monthlyDollars) {
       await ensureReady()
       const sql = sqlClient()

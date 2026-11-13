@@ -5,6 +5,7 @@ import {
   getBriefByEditTokenHash as findBriefByToken,
   getBriefById as findBrief,
   listBriefsForOwner,
+  releaseBriefsForClient,
   updateBriefRecord as saveBriefRecord,
 } from '../db'
 import {
@@ -575,6 +576,16 @@ export function createNeonStore(): PortalStore {
         if (duplicateEmail(error)) throw new Error('A client with that email already exists')
         throw error
       }
+    },
+
+    async deleteClient(id) {
+      await ensureReady()
+      const existing = await clientById(id)
+      if (!existing) throw new Error('Client not found')
+      await releaseBriefsForClient(id)
+      const sql = sqlClient()
+      const rows = await sql`DELETE FROM clients WHERE id = ${id} RETURNING id`
+      if (!rows[0]) throw new Error('Client not found')
     },
 
     async updateRenewal(id, renewalDate) {

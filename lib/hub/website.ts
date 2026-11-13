@@ -2,14 +2,30 @@ import { authorizeBearer } from '../portal/ingest'
 import { applyWebsiteLead, parseWebsiteLead } from './leads'
 import type { HubStore } from './types'
 
-/** Bearer token from WEBSITE_LEAD_TOKEN. Closed until that variable is set. */
+function acceptedTokens(token: string | undefined | readonly (string | undefined)[]): string[] {
+  const list = typeof token === 'string' || token == null ? [token] : token
+  const unique: string[] = []
+  for (const entry of list) {
+    const trimmed = entry?.trim()
+    if (!trimmed || unique.includes(trimmed)) continue
+    unique.push(trimmed)
+  }
+  return unique
+}
+
+/**
+ * Bearer token from WEBSITE_LEAD_TOKEN, or ACUITY_INGEST_TOKEN when the same bot
+ * posts the lead. Closed when neither secret is set. Either secret works when both are set.
+ */
 export async function handleWebsiteLead(
   request: Request,
   hub: HubStore,
-  token: string | undefined,
+  token: string | undefined | readonly (string | undefined)[],
   now: Date = new Date(),
 ): Promise<Response> {
-  if (!authorizeBearer(request.headers.get('authorization'), token)) {
+  const tokens = acceptedTokens(token)
+  const header = request.headers.get('authorization')
+  if (!tokens.some((secret) => authorizeBearer(header, secret))) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 })
   }
   let body: unknown

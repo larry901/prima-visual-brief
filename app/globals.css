@@ -479,6 +479,8 @@ body:has(.hub-root) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
+  white-space: nowrap;
   min-height: 48px;
   padding: 12px 14px;
   background: var(--hub-accent);
@@ -493,6 +495,11 @@ body:has(.hub-root) {
   background: transparent;
   color: #ffffff;
   border: 1px solid var(--hub-line);
+}
+.hub-btn-danger {
+  background: transparent;
+  color: #f2c1c1;
+  border: 1px solid rgba(242, 193, 193, 0.55);
 }
 .hub-btn-block { width: 100%; }
 .hub-chip {
@@ -589,4 +596,25 @@ body:has(.hub-root) {
   padding: 8px 0;
 }
 .hub-row { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+.hub-row > .hub-input { flex: 1; min-width: 0; width: auto; }
 .hub-filters { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+.hub-pull {
+  margin: 8px 0 0;
+  color: var(--hub-accent-text);
+  font-size: 0.8rem;
+  text-align: center;
+}
+.hub-busy { opacity: 0.65; }
+.hub-details {
+  margin-top: 28px;
+  border-top: 1px solid var(--hub-line);
+  padding-top: 8px;
+}
+.hub-details summary {
+  cursor: pointer;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  list-style: none;
+}
+.hub-details summary::-webkit-details-marker { display: none; }

@@ -3,6 +3,7 @@ import { ensureDemoSeed, demoSeedEnabled } from '../portal/seed'
 import { getPortalStore } from '../portal/store'
 import type { ClientRecord, PortalStore } from '../portal/types'
 import { loadPortalView } from '../portal/view'
+import { type HubClientCard } from './client-card'
 import { ensureHubDemo } from './demo'
 import { monthlyPriceFor } from './money'
 import { getHubStore } from './store'
@@ -10,22 +11,8 @@ import type { HubStore, LeadRecord, StageEvent, TouchRecord } from './types'
 import type { PlanSize } from '../portal/types'
 import type { AppointmentRecord } from '../portal/types'
 
-export interface HubClientCard {
-  id: number
-  name: string
-  company: string
-  email: string
-  kind: ClientRecord['kind']
-  active: boolean
-  planSize: number | null
-  used: number
-  remaining: number
-  renewalDate: string
-  renewalLabel: string
-  renewalSoon: boolean
-  monthlyDollars: number | null
-  priceSource: 'client' | 'plan' | 'unset'
-}
+export type { HubClientCard } from './client-card'
+export { partitionClients } from './client-card'
 
 export interface HubWorkspace {
   hub: HubStore
@@ -94,6 +81,7 @@ export async function loadClientCards(workspace: HubWorkspace): Promise<HubClien
         name: client.name,
         company: client.company,
         email: client.email,
+        additionalEmails: client.additionalEmails,
         kind: client.kind,
         active: client.active,
         planSize: client.planSize,
@@ -102,6 +90,9 @@ export async function loadClientCards(workspace: HubWorkspace): Promise<HubClien
         renewalDate: view.renewalDate,
         renewalLabel: view.renewalLabel || (view.renewalDate ? formatLongDate(view.renewalDate) : ''),
         renewalSoon: client.kind === 'subscription' && client.active && renewalSoon(view.renewalDate, today),
+        schedulingLink: client.schedulingLink,
+        frameioUrl: client.frameioUrl,
+        notionClientId: client.notionClientId,
         monthlyDollars: client.kind === 'subscription' ? price.dollars : null,
         priceSource: client.kind === 'subscription' ? price.source : 'unset',
       } satisfies HubClientCard

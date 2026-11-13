@@ -53,6 +53,7 @@ export function createFileHubStore(filePath: string): HubStore {
     setPlanPrice: (planSize, monthlyDollars) => run((store) => store.setPlanPrice(planSize, monthlyDollars)),
     getClientPrices: () => run((store) => store.getClientPrices()),
     setClientPrice: (clientId, monthlyDollars) => run((store) => store.setClientPrice(clientId, monthlyDollars)),
+    releaseClient: (clientId) => run((store) => store.releaseClient(clientId)),
     countRecentStaffLinks: (email, sinceIso) => run((store) => store.countRecentStaffLinks(email, sinceIso)),
     createStaffMagicLink: (email, tokenHash, expiresAt, now) =>
       run((store) => store.createStaffMagicLink(email, tokenHash, expiresAt, now)),

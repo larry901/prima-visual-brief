@@ -172,6 +172,21 @@ export class MemoryStore implements PortalStore {
     return client
   }
 
+  async deleteClient(id: number): Promise<void> {
+    const client = await this.getClient(id)
+    if (!client) throw new Error('Client not found')
+    for (const appointment of this.data.appointments) {
+      if (appointment.clientId === id) appointment.clientId = null
+    }
+    for (const brief of this.data.briefs) {
+      if (brief.client_id === id) brief.client_id = null
+    }
+    this.data.magicLinks = this.data.magicLinks.filter((link) => link.clientId !== id)
+    this.data.sessions = this.data.sessions.filter((session) => session.clientId !== id)
+    this.data.personalLinks = this.data.personalLinks.filter((link) => link.clientId !== id)
+    this.data.clients = this.data.clients.filter((row) => row.id !== id)
+  }
+
   private assertEmailsAvailable(emails: string[], exceptId?: number) {
     const wanted = new Set(emails)
     for (const other of this.data.clients) {
