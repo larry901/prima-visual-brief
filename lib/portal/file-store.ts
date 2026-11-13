@@ -58,6 +58,7 @@ export function createFileStore(filePath: string): PortalStore {
     insertAppointment: (row) => run((store) => store.insertAppointment(row)),
     updateAppointment: (id, patch) => run((store) => store.updateAppointment(id, patch)),
     listAppointmentsForClient: (clientId) => run((store) => store.listAppointmentsForClient(clientId)),
+    listAppointments: () => run((store) => store.listAppointments()),
     listNeedsReview: () => run((store) => store.listNeedsReview()),
     dismissReview: (id) => run((store) => store.dismissReview(id)),
     attachUnmatched: (email, clientId) => run((store) => store.attachUnmatched(email, clientId)),

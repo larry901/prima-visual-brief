@@ -113,6 +113,8 @@ export interface PortalStore extends IngestStore {
   updateClient(id: number, input: ClientInput): Promise<ClientRecord>
   updateRenewal(id: number, renewalDate: string): Promise<void>
   listAppointmentsForClient(clientId: number): Promise<AppointmentRecord[]>
+  /** Every stored appointment, including unmatched and discovery calls. */
+  listAppointments(): Promise<AppointmentRecord[]>
   listNeedsReview(): Promise<AppointmentRecord[]>
   dismissReview(id: number): Promise<boolean>
   attachUnmatched(email: string, clientId: number): Promise<void>

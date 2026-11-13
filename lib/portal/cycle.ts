@@ -1,5 +1,7 @@
 /** Billing-cycle math for the client portal. Pure functions, no database. */
 
+import { isDiscoveryAppointmentType } from './appointment-types'
+
 export const CHICAGO = 'America/Chicago'
 
 export const DEFAULT_COUNTED_TYPES = [
@@ -103,6 +105,7 @@ export function resolveCycle(storedRenewal: string, today: string, anchorDay?: n
 }
 
 export function isCountedType(type: string, countedTypes: string[]): boolean {
+  if (isDiscoveryAppointmentType(type)) return false
   const norm = type.trim().toLowerCase()
   if (!norm) return false
   return countedTypes.some((entry) => entry.trim().toLowerCase() === norm)

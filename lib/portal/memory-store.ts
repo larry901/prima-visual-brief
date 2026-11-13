@@ -234,6 +234,10 @@ export class MemoryStore implements PortalStore {
       .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime())
   }
 
+  async listAppointments(): Promise<AppointmentRecord[]> {
+    return [...this.data.appointments].sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime())
+  }
+
   async listNeedsReview(): Promise<AppointmentRecord[]> {
     return this.data.appointments
       .filter((row) => row.needsReview)

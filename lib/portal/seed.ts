@@ -11,9 +11,9 @@ export function demoSeedEnabled(): boolean {
 export async function seedDemoRoster(store: PortalStore, now: Date = new Date()): Promise<void> {
   await store.ensureReady()
   const today = chicagoToday(now)
-  const mayaRenewal = addDays(today, 18)
+  const mayaRenewal = addDays(today, 9)
   const priyaRenewal = addDays(today, 40)
-  const upcoming = chicagoWallTimeToUtc(addDays(today, 3), 10, 0).toISOString()
+  const upcoming = chicagoWallTimeToUtc(addDays(today, 1), 10, 0).toISOString()
   const past = chicagoWallTimeToUtc(addDays(today, -6), 9, 30).toISOString()
   const call = chicagoWallTimeToUtc(addDays(today, 1), 15, 0).toISOString()
   const unmatchedStart = chicagoWallTimeToUtc(addDays(today, 5), 11, 0).toISOString()
@@ -83,7 +83,7 @@ export async function seedDemoRoster(store: PortalStore, now: Date = new Date())
     email: maya.email,
     name: maya.name,
     property: '1426 Cortlandt St, Houston, TX 77008',
-    shootDate: addDays(today, 3),
+    shootDate: addDays(today, 1),
     highlights: 'Morning light on the oak floors and a slow push into the kitchen.',
   })
   await upsertDemoBrief(store, {

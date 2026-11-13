@@ -82,6 +82,20 @@ describe('shoots remaining', () => {
     assert.deepEqual(tally, { used: 2, remaining: 2 })
   })
 
+  it('does not count a discovery call even when that type is listed', () => {
+    const tally = shootsRemaining({
+      planSize: 4,
+      ...cycle,
+      countedTypes: [...COUNTED, 'Discovery Call', 'Discovery'],
+      appointments: [
+        { appointmentType: 'Discovery Call', startAt: '2026-03-04T16:00:00.000Z', status: 'scheduled' },
+        { appointmentType: 'discovery session', startAt: '2026-03-05T16:00:00.000Z', status: 'scheduled' },
+        { appointmentType: 'Listing Shoot', startAt: '2026-03-06T16:00:00.000Z', status: 'scheduled' },
+      ],
+    })
+    assert.deepEqual(tally, { used: 1, remaining: 3 })
+  })
+
   it('includes the cycle start, excludes the renewal date, and uses Chicago calendar days', () => {
     const onStart = shootsRemaining({
       planSize: 2,

@@ -1,4 +1,10 @@
 import { timingSafeEqual } from 'crypto'
+import { applyDiscoveryLead } from '../hub/leads'
+import type { HubStore } from '../hub/types'
+import { isDiscoveryAppointmentType } from './appointment-types'
+import { normalizeEmail as normalizeEmailAddress } from './email'
+
+export { normalizeEmail } from './email'
 import type {
   AppointmentPatch,
   AppointmentRecord,
@@ -15,6 +21,10 @@ export interface IngestEvent {
   start: string
   acuity_appointment_id?: string
   raw_subject?: string
+  /** Optional. Used when the appointment is a discovery call. */
+  phone?: string
+  /** Optional. Used when the appointment is a discovery call. */
+  company?: string
 }
 
 export interface IngestResult {
@@ -23,10 +33,6 @@ export interface IngestResult {
   appointment_id: number
   needs_review: boolean
   review_reason: string | null
-}
-
-export function normalizeEmail(email: string): string {
-  return email.trim().toLowerCase()
 }
 
 export function authorizeBearer(header: string | null, secret: string | undefined): boolean {
@@ -68,6 +74,12 @@ export function parseIngestBody(body: unknown): { ok: true; value: IngestEvent }
   if (record.raw_subject !== undefined && record.raw_subject !== null && typeof record.raw_subject !== 'string') {
     return { ok: false, error: 'raw_subject must be a string' }
   }
+  if (record.phone !== undefined && record.phone !== null && typeof record.phone !== 'string') {
+    return { ok: false, error: 'phone must be a string' }
+  }
+  if (record.company !== undefined && record.company !== null && typeof record.company !== 'string') {
+    return { ok: false, error: 'company must be a string' }
+  }
   return {
     ok: true,
     value: {
@@ -79,6 +91,8 @@ export function parseIngestBody(body: unknown): { ok: true; value: IngestEvent }
       acuity_appointment_id:
         typeof record.acuity_appointment_id === 'string' ? record.acuity_appointment_id : undefined,
       raw_subject: typeof record.raw_subject === 'string' ? record.raw_subject : undefined,
+      phone: typeof record.phone === 'string' ? record.phone : undefined,
+      company: typeof record.company === 'string' ? record.company : undefined,
     },
   }
 }
@@ -123,7 +137,7 @@ function sameSnapshot(row: AppointmentRecord, next: NewAppointment): boolean {
  * Reschedule/cancel without an Acuity id only edits a row when the match is unique.
  */
 export async function applyIngestEvent(event: IngestEvent, store: IngestStore): Promise<IngestResult> {
-  const email = normalizeEmail(event.client_email)
+  const email = normalizeEmailAddress(event.client_email)
   const appointmentType = event.appointment_type.trim()
   const startAt = new Date(event.start).toISOString()
   const acuityId = event.acuity_appointment_id?.trim() || null
@@ -279,10 +293,25 @@ function patchOf(next: NewAppointment): AppointmentPatch {
   }
 }
 
+export interface AcuityIngestOptions {
+  /** When set, discovery calls also create or update a lead. Shoots never do. */
+  hub?: HubStore
+  now?: Date
+}
+
+/**
+ * Same contract as before, plus lead_id and lead_action.
+ * Those are null for shoots and strategy calls.
+ * Discovery calls are stored as appointments and excluded from shoot counts.
+ * An unmatched discovery call is not left in the roster review queue.
+ * If the lead write fails, the response is 500 so the bot can retry.
+ * The appointment upsert is idempotent.
+ */
 export async function handleAcuityIngest(
   request: Request,
   store: IngestStore,
   token: string | undefined,
+  options: AcuityIngestOptions = {},
 ): Promise<Response> {
   if (!authorizeBearer(request.headers.get('authorization'), token)) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 })
@@ -295,6 +324,29 @@ export async function handleAcuityIngest(
   }
   const parsed = parseIngestBody(body)
   if (!parsed.ok) return Response.json({ error: parsed.error }, { status: 400 })
-  const outcome = await applyIngestEvent(parsed.value, store)
-  return Response.json(outcome)
+  let outcome = await applyIngestEvent(parsed.value, store)
+  const discovery = isDiscoveryAppointmentType(parsed.value.appointment_type)
+  if (discovery && outcome.needs_review && outcome.review_reason === 'unmatched_client') {
+    const row = await store.updateAppointment(outcome.appointment_id, {
+      needsReview: false,
+      reviewReason: null,
+    })
+    outcome = { ...outcome, needs_review: row.needsReview, review_reason: row.reviewReason }
+  }
+  if (!discovery) {
+    return Response.json({ ...outcome, lead_id: null, lead_action: null })
+  }
+  if (!options.hub) {
+    return Response.json({ ...outcome, lead_id: null, lead_action: null })
+  }
+  try {
+    const lead = await applyDiscoveryLead(parsed.value, options.hub, options.now ?? new Date())
+    return Response.json({ ...outcome, lead_id: lead.leadId, lead_action: lead.action })
+  } catch (error) {
+    console.error('Discovery lead failed:', error instanceof Error ? error.message : 'error')
+    return Response.json(
+      { error: 'Discovery call was saved but the lead could not be updated. Retry the same POST.' },
+      { status: 500 },
+    )
+  }
 }

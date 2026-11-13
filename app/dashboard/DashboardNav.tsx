@@ -12,6 +12,9 @@ export default function DashboardNav({ current }: { current: 'briefs' | 'clients
       <Link href="/dashboard/clients" className={className(current === 'clients')}>
         Clients
       </Link>
+      <Link href="/hub/" className={className(false)}>
+        Hub
+      </Link>
     </nav>
   )
 }
