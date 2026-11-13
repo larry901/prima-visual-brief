@@ -680,6 +680,13 @@ export function createNeonStore(): PortalStore {
       return (rows as AppointmentRow[]).map(mapAppointment)
     },
 
+    async listAppointments() {
+      await ensureReady()
+      const sql = sqlClient()
+      const rows = await sql`SELECT * FROM appointments ORDER BY start_at ASC`
+      return (rows as AppointmentRow[]).map(mapAppointment)
+    },
+
     async listNeedsReview() {
       await ensureReady()
       const sql = sqlClient()

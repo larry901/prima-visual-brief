@@ -13,6 +13,7 @@ A full-stack Next.js 14 web application for collecting pre-shoot creative briefs
 - Mobile-first responsive design with a luxury real estate aesthetic
 - Client portal at `/portal` for retainer clients: plan, shoots left, next-shoot countdown, one Frame.io link, video edit progress from Notion, and an embedded Acuity scheduler
 - Passwordless email sign-in for roster emails, and a bearer-token endpoint that records Acuity notification emails
+- Staff hub at `/hub` for two people: leads, follow-ups, Notion edits, roster health, and KPIs. It does not message clients.
 
 ## Prerequisites
 
@@ -46,6 +47,8 @@ cp .env.local.example .env.local
 | `DASHBOARD_PASSWORD` | Yes | Password for `/dashboard`. The session cookie is signed with a key derived from this value, so changing it signs everyone out. The same value encrypts each client's personal portal link. After a change, the Clients page can't show an existing link until you reset it. A link a client already saved keeps working until that reset. |
 | `APP_URL` | No | Public origin used in magic-link emails. Production: `https://brief.primavisual.io`. When unset, the link uses the request host, which is what you want on preview URLs. |
 | `ACUITY_INGEST_TOKEN` | For ingest | Bearer token for `POST /api/ingest/acuity`. The route returns 401 until this is set. |
+| `WEBSITE_LEAD_TOKEN` | For website leads | Bearer token for `POST /api/ingest/website-lead`. Separate from the Acuity token. The route returns 401 until this is set. |
+| `STAFF_EMAILS` | For the hub | Comma-separated staff inboxes that can request a Prima Hub magic link. Do not commit real addresses. The dashboard password still opens the hub if this is unset. |
 | `PORTAL_DEMO_SEED` | No | Set to `true` locally or on a preview deployment to load fictional `@example.com` clients and to show their sign-in links on screen. Leave unset in production. |
 | `NOTION_TOKEN` | No | Read-only internal integration token for the Prima Visual Edit database. When set, a linked client sees Video progress on `/portal`, and Clients can pick a Notion page. When unset, or if Notion errors, that section is hidden. |
 
@@ -148,11 +151,13 @@ There are no reminder emails or texts. Crystal keeps doing those.
 
 The renewal date is the day a new cycle starts. On that morning in America/Chicago the plan resets to its monthly count (1, 2, or 4) and the renewal date moves forward one month. The billing day is remembered, so a plan that renews on the 31st uses the last day of a short month and returns to the 31st afterward (January 31 → February 28/29 → March 31).
 
-Only appointment types in the dashboard list **Shoots that count** use up a shoot. The starting list includes Listing Shoot, Property Shoot, Video Shoot, Real Estate Shoot, Photo & Video Shoot, and One-Time Shoot (the shoot type on the public scheduler today). Discovery Call does not count unless someone adds it. Cancelled shoots do not count. Rescheduled shoots count once.
+Only appointment types in the dashboard list **Shoots that count** use up a shoot. The starting list includes Listing Shoot, Property Shoot, Video Shoot, Real Estate Shoot, Photo & Video Shoot, and One-Time Shoot (the shoot type on the public scheduler today). A discovery call never counts, even if someone adds it to that list. It opens a lead in the hub instead. Cancelled shoots do not count. Rescheduled shoots count once.
 
 ### Storage
 
-The portal uses the Neon database the brief form already uses (`POSTGRES_URL`). New tables (`clients`, `client_emails`, `appointments`, `magic_links`, `portal_sessions`, `portal_settings`, `client_portal_links`, `portal_link_attempts`, `video_stage_memory`) are created on the first portal, roster, or ingest request, and `clients.notion_client_id` is added the same way. `client_emails` only stores addresses beyond the primary, so existing clients are unchanged. No second database, no manual migration, and no paid plan.
+The portal uses the Neon database the brief form already uses (`POSTGRES_URL`). New tables (`clients`, `client_emails`, `appointments`, `magic_links`, `portal_sessions`, `portal_settings`, `client_portal_links`, `portal_link_attempts`, `video_stage_memory`) are created on the first portal, roster, or ingest request, and `clients.notion_client_id` is added the same way. Hub tables (`leads`, `lead_stage_events`, `lead_touches`, `hub_plan_prices`, `hub_client_prices`, `hub_magic_links`, `hub_sessions`) are created the same way, on the first signed-in hub request or the first discovery-call or website-lead ingest. `client_emails` only stores addresses beyond the primary, so existing clients are unchanged. No second database, no manual migration, and no paid plan.
+
+Do not run `npm run seed:portal` against production. After deploy, set the hub env vars, sign in at `/hub` once (or send one discovery-call POST). That first request runs `CREATE TABLE IF NOT EXISTS`. It does not rewrite portal rows. A preview that shares the production `POSTGRES_URL` creates those tables in production on that first authenticated request. That is the migration. It is idempotent.
 
 If this project does not have Neon yet:
 
@@ -204,6 +209,8 @@ Content-Type: application/json
 | `start` | Yes | ISO 8601 datetime. The new time for a reschedule. |
 | `acuity_appointment_id` | No | Strongly preferred. Upserts are keyed on it. |
 | `raw_subject` | No | Original Gmail subject, shown in the review list |
+| `phone` | No | String. Stored on a discovery-call lead when that lead has no phone yet. |
+| `company` | No | String. Stored on a discovery-call lead when that lead has no company yet. |
 
 `event: "new"` maps to status `scheduled`. Repeating the same event does not create a second row. A repeated `new` will not move a shoot that was already rescheduled or cancelled. Without an Acuity id, a reschedule or cancellation updates a row only when exactly one open appointment of that type exists for the email. If several could match, the event is stored for review and the existing rows are left alone.
 
@@ -213,7 +220,77 @@ An email whose address is not on the roster is saved with `needs_review: true` a
 { "ok": true, "action": "created", "appointment_id": 12, "needs_review": false, "review_reason": null }
 ```
 
-`action` is `created`, `updated`, or `unchanged`. `401` means the bearer token is missing or wrong. `400` means the JSON didn't match the shape above.
+`action` is `created`, `updated`, or `unchanged`. The response also includes `lead_id` and `lead_action`. Both are `null` for shoots and strategy calls. `401` means the bearer token is missing or wrong. `400` means the JSON didn't match the shape above.
+
+### Discovery calls
+
+The bot should post discovery calls to the same route. Do not skip them. `appointment_type` must be `Discovery`, `Discovery Call`, or any name that starts with `Discovery ` (case-insensitive; underscores and hyphens count as spaces). `Strategy Call` is not a discovery call.
+
+```json
+{
+  "event": "new",
+  "client_email": "prospect@example.com",
+  "client_name": "Jordan Lee",
+  "appointment_type": "Discovery Call",
+  "start": "2026-11-20T15:00:00.000Z",
+  "acuity_appointment_id": "9876543210",
+  "raw_subject": "New Appointment: Discovery Call with Jordan Lee",
+  "phone": "312-555-0199",
+  "company": "Lee Realty"
+}
+```
+
+`phone` and `company` are optional. `event` is still `new`, `rescheduled`, or `cancelled`. Repeating the same payload does not create a second lead. The lead is matched by email. A new lead is stage `Discovery Booked` and source `Acuity discovery call`. An open lead that was already `New` moves to `Discovery Booked`. A later stage is not moved backward. The original source is kept, so a referral who then books on Acuity still converts as a referral. A won or lost lead is left alone and a new open lead is created. A cancellation keeps the stage and marks the call cancelled.
+
+The appointment is stored so the hub can show it. It does not reduce shoots left. An unmatched discovery call is not left in the roster **Needs review** queue. If the lead write fails, the route returns 500 and the bot should retry the same body. The appointment upsert is idempotent.
+
+```json
+{ "ok": true, "action": "created", "appointment_id": 12, "needs_review": false, "review_reason": null, "lead_id": 4, "lead_action": "created" }
+```
+
+`lead_action` is `created`, `updated`, or `unchanged`.
+
+### Website form leads
+
+The marketing site is separate. Its server posts new form leads here. Do not call this from the browser. The token is `WEBSITE_LEAD_TOKEN`, not the Acuity token.
+
+```http
+POST /api/ingest/website-lead
+Authorization: Bearer $WEBSITE_LEAD_TOKEN
+Content-Type: application/json
+```
+
+```json
+{
+  "name": "Casey Ortiz",
+  "email": "casey.ortiz@example.com",
+  "phone": "713-555-0177",
+  "company": "Ortiz Homes",
+  "message": "Looking at a one-time shoot.",
+  "service_type": "project",
+  "estimated_value": 6000,
+  "source": "Website form"
+}
+```
+
+| Field | Required | Notes |
+|---|---|---|
+| `name` | Yes | |
+| `email` | Yes | Matched to an open lead, case-insensitive |
+| `phone` | No | Fills a blank phone. Does not overwrite one staff already entered |
+| `company` | No | Same |
+| `message` | No | Appended to notes. The same message sent again is not duplicated |
+| `service_type` | No | `subscription` or `project` |
+| `estimated_value` | No | Whole dollars |
+| `source` | No | Omit it, or send `Website form` |
+
+A new lead is stage `New`, source `Website form`, and the follow-up date is today in America/Chicago so it shows on Today. An open lead with the same email is updated instead of duplicated. Won and lost leads are not reopened.
+
+```json
+{ "ok": true, "lead_id": 8, "action": "created" }
+```
+
+`action` is `created`, `updated`, or `unchanged`. `401` means the bearer token is missing or wrong. `400` means the JSON didn't match. The hub does not email the person.
 
 ```bash
 curl -s -X POST https://brief.primavisual.io/api/ingest/acuity \
@@ -229,10 +306,29 @@ The brief form's variables stay as they are. For the portal, add:
 | Name | Environments | Value |
 |---|---|---|
 | `ACUITY_INGEST_TOKEN` | Production, and Preview if the bot should hit a preview | A long random string. Give the same value to Crystal's bot. |
+| `WEBSITE_LEAD_TOKEN` | Production, and Preview if the website should hit a preview | A different long random string. Give it to the website server only. |
+| `STAFF_EMAILS` | Production, and Preview if staff should sign in there | Comma-separated staff inboxes. Do not commit them. |
 | `APP_URL` | Production | `https://brief.primavisual.io` |
 | `PORTAL_DEMO_SEED` | Preview only, optional | `true` |
 
 Do not enable `PORTAL_DEMO_SEED` on production. Redeploy after saving the variables. Then sign in at `/dashboard`, open **Clients**, and add the real roster. Clients visit `https://brief.primavisual.io/portal`.
+
+## Prima Hub
+
+Staff open `/hub` on a phone. It installs as **Prima Hub** (manifest scope `/hub/`, standalone). The client portal does not link to it. A client session cannot open it.
+
+Sign-in is a magic link to an address in `STAFF_EMAILS`. The existing dashboard password session also opens the hub, and the dashboard itself is unchanged. Signing out of the hub also ends that dashboard session, because the password session is accepted as hub access. The hub does not email or text leads or clients. Suggested follow-up text is copied by staff and sent by them. Web push for due follow-ups is a later phase. The unused hook is `notifyDueFollowUps` in `lib/hub/push.ts`.
+
+Tabs: Today, Leads, Edits, Clients, KPIs. Edits read the same Notion Edit database as the portal and show internal statuses. Clients reuse the roster, cycle math, and shoot counts. Monthly subscription prices are entered by staff on KPIs (per plan) and Clients (per client). They are not read from Stripe.
+
+KPIs that are approximate because the data is limited:
+
+- Revenue is estimated deal value plus staff-entered monthly prices, not cash collected. A new subscriber can be counted in both in the same month if both numbers are filled in.
+- Stripe would plug in at `computeKpis` in `lib/hub/kpis.ts`: subscription amounts replace the monthly price fields, and collected invoices replace won-this-month.
+- Conversion uses stage changes stored after this install. Older leads are not backfilled. A deal marked Won counts as having reached discovery.
+- Edit turnaround is Date Shot to Completed Date on rows currently Completed or Approved. Revision rate only sees the current Notion status.
+- Subscriber churn is the share of subscription clients marked inactive. There is no cancellation date.
+- Shoots per week only include appointments the bot has posted. Discovery calls are excluded.
 
 ## Project Structure
 
@@ -240,16 +336,20 @@ Do not enable `PORTAL_DEMO_SEED` on production. Redeploy after saving the variab
 app/
   brief/           — Public brief submission form
   portal/          — Client portal (magic-link sign-in and personal links)
+  hub/             — Staff hub (PWA). Not linked from the portal.
   dashboard/       — Staff dashboard (password protected), including Clients
   api/             — API routes
     submit-brief/  — Saves brief to DB + sends email
     upload/        — File upload handler
     dashboard/     — Auth, briefs, and client roster
-    ingest/acuity/ — Acuity notification ingest
+    hub/           — Staff lead, touch, convert, and price routes
+    ingest/acuity/ — Acuity notification ingest, including discovery calls
+    ingest/website-lead/ — Website form leads
     portal/        — Magic-link login and logout
 lib/
   db.ts            — Neon Postgres queries for briefs
   portal/          — Cycle math, ingest, roster store, magic links
+  hub/             — Leads, follow-ups, KPIs, staff magic links
   email.ts         — Resend email templates
   spotify.ts       — Spotify Client Credentials API
   storage.ts       — Local disk / S3 file storage
@@ -257,5 +357,6 @@ lib/
   dashboard-session.ts — HMAC session token (Node and Edge)
 middleware.ts          — Requires that cookie on dashboard pages and APIs
 public/
+  hub/             — Prima Hub manifest, icons, and network-only service worker
   uploads/         — Local file upload directory (dev only)
 ```

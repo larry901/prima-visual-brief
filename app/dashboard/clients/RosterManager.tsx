@@ -302,7 +302,7 @@ export default function RosterManager({
       <section className="card p-5 space-y-3">
         <h2 className="font-display text-2xl font-semibold">Shoots that count</h2>
         <p className="text-sm text-brand-muted">
-          One Acuity appointment type per line. Discovery calls and anything not listed stay off the monthly count.
+          One Acuity appointment type per line. Discovery calls never count, even if they are listed here. They open a lead in the hub instead. Anything else not listed stays off the monthly count.
         </p>
         <label className="block text-sm font-medium" htmlFor="counted-types">Appointment types</label>
         <textarea

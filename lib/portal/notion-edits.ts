@@ -1,3 +1,4 @@
+import { staffEditFromSnapshot, type StaffEdit } from '../hub/edits'
 import type { PortalStore } from './types'
 import {
   snapshotFromNotionPage,
@@ -112,6 +113,11 @@ async function notionQuery(
   return pages
 }
 
+async function queryAllEdits(fetchImpl: NotionFetch): Promise<NotionEditSnapshot[]> {
+  const raw = await notionQuery(EDIT_DATA_SOURCE_ID, {}, fetchImpl)
+  return raw.map((page) => snapshotFromNotionPage(page)).filter((page): page is NotionEditSnapshot => page != null)
+}
+
 async function queryEdits(clientPageId: string, fetchImpl: NotionFetch): Promise<NotionEditSnapshot[]> {
   const raw = await notionQuery(
     EDIT_DATA_SOURCE_ID,
@@ -160,6 +166,26 @@ async function queryClients(fetchImpl: NotionFetch): Promise<{ id: string; name:
   }
   clients.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }) || a.id.localeCompare(b.id))
   return clients
+}
+
+/**
+ * Every row in the Edit database, for staff. Internal statuses are included.
+ * Null when Notion is not configured or the request failed.
+ */
+export async function loadStaffEditBoard(fetchImpl?: NotionFetch): Promise<StaffEdit[] | null> {
+  if (!notionConfigured()) return null
+  try {
+    const loadPages = () => queryAllEdits(fetchImpl ?? defaultFetch)
+    const [pages, clients] = await Promise.all([
+      fetchImpl ? loadPages() : cached('edits:all', loadPages),
+      listNotionClients(fetchImpl),
+    ])
+    const names = new Map(clients.map((client) => [client.id, client.name]))
+    return pages.map((page) => staffEditFromSnapshot(page, names))
+  } catch (error) {
+    console.error('Staff edits unavailable', error instanceof Error ? error.message : 'error')
+    return null
+  }
 }
 
 export async function listNotionClients(fetchImpl?: NotionFetch): Promise<{ id: string; name: string }[]> {
