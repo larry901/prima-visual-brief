@@ -84,7 +84,10 @@ export interface KpiReport {
   revisionCount: number
   revisionBase: number
   renewalsSoon: number
+  /** Active subscription clients. Inactive clients are not included. */
+  activeSubscribers: number
   inactiveSubscribers: number
+  /** Active plus inactive, used only as the churn denominator. */
   subscriptionClients: number
   churnRate: number | null
   unusedShoots: number
@@ -307,6 +310,7 @@ export function computeKpis(input: KpiInput): KpiReport {
     return shootsOnDates(input.appointments, input.countedTypes, start, addDays(start, 6))
   })
   const weekCounts = [shootsThisWeek, ...shootsPriorWeeks]
+  const activeSubscribers = input.subscribers.filter((subscriber) => subscriber.active).length
   const subscriptionClients = input.subscribers.length
 
   return {
@@ -331,6 +335,7 @@ export function computeKpis(input: KpiInput): KpiReport {
     overdueFollowUps: input.leads.filter((lead) => followUpState(lead, input.today) === 'overdue').length,
     ...edits,
     renewalsSoon,
+    activeSubscribers,
     inactiveSubscribers,
     subscriptionClients,
     churnRate: subscriptionClients === 0 ? null : inactiveSubscribers / subscriptionClients,

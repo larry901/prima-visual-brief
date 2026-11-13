@@ -15,7 +15,8 @@ export default async function KpisPage() {
   const workspace = await loadWorkspace()
   const cards = await loadClientCards(workspace)
   const configured = notionConfigured()
-  const live = configured ? await loadStaffEditBoard() : null
+  const liveBoard = configured ? await loadStaffEditBoard() : null
+  const live = liveBoard?.edits ?? null
   const usingSample = !configured && demoSeedEnabled()
   const edits = (live ?? (usingSample ? sampleStaffEdits() : [])).map((edit) => ({
     status: edit.status,
@@ -139,12 +140,11 @@ export default async function KpisPage() {
           <p className="hub-stat">{report.renewalsSoon}</p>
         </article>
         <article className="hub-card">
-          <p className="hub-kicker">Inactive subscribers</p>
-          <p className="hub-stat">
-            {report.inactiveSubscribers}
-            <span style={{ fontSize: '1rem' }}>/{report.subscriptionClients}</span>
+          <p className="hub-kicker">Subscribers</p>
+          <p className="hub-stat">{report.activeSubscribers}</p>
+          <p className="hub-muted">
+            {report.inactiveSubscribers} inactive · churn {formatPercent(report.churnRate)}
           </p>
-          <p className="hub-muted">Churn {formatPercent(report.churnRate)}</p>
         </article>
       </section>
 

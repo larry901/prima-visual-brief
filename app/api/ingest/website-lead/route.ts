@@ -7,7 +7,10 @@ export async function POST(request: Request) {
   try {
     const hub = getHubStore()
     await hub.ensureReady()
-    return handleWebsiteLead(request, hub, process.env.WEBSITE_LEAD_TOKEN)
+    return handleWebsiteLead(request, hub, {
+      website: process.env.WEBSITE_LEAD_TOKEN,
+      acuity: process.env.ACUITY_INGEST_TOKEN,
+    })
   } catch (error) {
     console.error('Website lead ingest failed:', error instanceof Error ? error.message : 'error')
     return Response.json({ error: 'Ingest failed' }, { status: 500 })

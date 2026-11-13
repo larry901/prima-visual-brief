@@ -15,6 +15,7 @@ export interface HubClientCard {
   name: string
   company: string
   email: string
+  additionalEmails: string[]
   kind: ClientRecord['kind']
   active: boolean
   planSize: number | null
@@ -23,6 +24,9 @@ export interface HubClientCard {
   renewalDate: string
   renewalLabel: string
   renewalSoon: boolean
+  schedulingLink: string | null
+  frameioUrl: string | null
+  notionClientId: string | null
   monthlyDollars: number | null
   priceSource: 'client' | 'plan' | 'unset'
 }
@@ -94,6 +98,7 @@ export async function loadClientCards(workspace: HubWorkspace): Promise<HubClien
         name: client.name,
         company: client.company,
         email: client.email,
+        additionalEmails: client.additionalEmails,
         kind: client.kind,
         active: client.active,
         planSize: client.planSize,
@@ -102,6 +107,9 @@ export async function loadClientCards(workspace: HubWorkspace): Promise<HubClien
         renewalDate: view.renewalDate,
         renewalLabel: view.renewalLabel || (view.renewalDate ? formatLongDate(view.renewalDate) : ''),
         renewalSoon: client.kind === 'subscription' && client.active && renewalSoon(view.renewalDate, today),
+        schedulingLink: client.schedulingLink,
+        frameioUrl: client.frameioUrl,
+        notionClientId: client.notionClientId,
         monthlyDollars: client.kind === 'subscription' ? price.dollars : null,
         priceSource: client.kind === 'subscription' ? price.source : 'unset',
       } satisfies HubClientCard
