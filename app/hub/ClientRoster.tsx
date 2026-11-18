@@ -1,14 +1,16 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import AddClientForm from './AddClientForm'
 import { copyText } from '@/lib/copy-text'
+import type { HubBriefCard } from '@/lib/hub/brief-match'
 import { partitionClients, type HubClientCard } from '@/lib/hub/client-card'
 import { formatDollars } from '@/lib/hub/money'
 import type { ClientKind, PlanSize } from '@/lib/portal/types'
 
-type RosterClient = HubClientCard & { portalUrl: string | null }
+type RosterClient = HubClientCard & { portalUrl: string | null; briefs: HubBriefCard[] }
 
 interface Draft {
   name: string
@@ -61,7 +63,13 @@ async function readError(response: Response, fallback: string): Promise<string> 
   return data && typeof data.error === 'string' ? data.error : fallback
 }
 
-export default function ClientRoster({ clients }: { clients: RosterClient[] }) {
+export default function ClientRoster({
+  clients,
+  unmatchedBriefs,
+}: {
+  clients: RosterClient[]
+  unmatchedBriefs: HubBriefCard[]
+}) {
   const router = useRouter()
   const { subscribers, projects, inactive } = partitionClients(clients)
   const unused = subscribers.reduce((sum, client) => sum + client.remaining, 0)
@@ -230,6 +238,17 @@ export default function ClientRoster({ clients }: { clients: RosterClient[] }) {
           </ul>
         </details>
       )}
+
+      {unmatchedBriefs.length > 0 ? (
+        <section className="hub-section" aria-labelledby="unmatched-briefs">
+          <h2 id="unmatched-briefs">Briefs not on a client · {unmatchedBriefs.length}</h2>
+          <p className="hub-muted">
+            A brief is placed by its saved client, or by an email on the account. A name alone is not used. A brief
+            that fits more than one client stays here.
+          </p>
+          <BriefLinks briefs={unmatchedBriefs} label="" />
+        </section>
+      ) : null}
     </>
   )
 }
@@ -240,6 +259,41 @@ function parseMonthly(value: string): number | null | 'bad' {
   const numeric = Number(trimmed.replace(/[$,\s]/g, ''))
   if (!Number.isFinite(numeric) || numeric < 0 || numeric > 1_000_000) return 'bad'
   return Math.round(numeric)
+}
+
+function BriefLinks({ briefs, label = 'Briefs' }: { briefs: HubBriefCard[]; label?: string }) {
+  if (briefs.length === 0) return null
+  const newest = briefs.slice(0, 4)
+  const older = briefs.slice(4)
+  return (
+    <div className="hub-stack">
+      <p className="hub-kicker">{label}</p>
+      <ul className="hub-brief-list">{newest.map((brief) => <BriefRow key={brief.id} brief={brief} />)}</ul>
+      {older.length > 0 ? (
+        <details className="hub-more">
+          <summary>
+            {older.length} older brief{older.length === 1 ? '' : 's'}
+          </summary>
+          <ul className="hub-brief-list">{older.map((brief) => <BriefRow key={brief.id} brief={brief} />)}</ul>
+        </details>
+      ) : null}
+    </div>
+  )
+}
+
+function BriefRow({ brief }: { brief: HubBriefCard }) {
+  return (
+    <li>
+      <Link href={`/hub/briefs/${brief.id}`} className="hub-brief">
+        <span className="hub-brief-date">{brief.shootLabel}</span>
+        <span className="hub-brief-title">{brief.title}</span>
+        <span className="hub-muted">
+          {brief.status}
+          {brief.edited ? ' · Edited by client' : ''}
+        </span>
+      </Link>
+    </li>
+  )
 }
 
 function ClientCard({
@@ -283,6 +337,7 @@ function ClientCard({
           </p>
         </>
       )}
+      <BriefLinks briefs={client.briefs} />
       <CopyLinkButton
         clientId={client.id}
         name={client.name}

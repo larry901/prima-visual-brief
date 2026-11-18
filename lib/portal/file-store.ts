@@ -94,5 +94,6 @@ export function createFileStore(filePath: string): PortalStore {
     getBriefByEditTokenHash: (tokenHash) => run((store) => store.getBriefByEditTokenHash(tokenHash)),
     createBriefRecord: (row) => run((store) => store.createBriefRecord(row)),
     updateBriefRecord: (id, patch) => run((store) => store.updateBriefRecord(id, patch)),
+    setBriefNotionLink: (id, pageId, source) => run((store) => store.setBriefNotionLink(id, pageId, source)),
   }
 }
