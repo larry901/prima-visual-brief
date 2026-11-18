@@ -14,6 +14,7 @@ function edit(overrides: Partial<StaffEdit> & Pick<StaffEdit, 'id' | 'status'>):
     turnaroundDays: null,
     notionUrl: 'https://www.notion.so/sample',
     lastEditedAt: null,
+    clientIds: [],
     ...overrides,
   }
 }

@@ -6,6 +6,7 @@ import {
   getBriefById as findBrief,
   listBriefsForOwner,
   releaseBriefsForClient,
+  saveBriefNotionLink,
   updateBriefRecord as saveBriefRecord,
 } from '../db'
 import {
@@ -931,6 +932,14 @@ export function createNeonStore(): PortalStore {
 
     async updateBriefRecord(id, patch) {
       const updated = await saveBriefRecord(id, patch)
+      if (!updated) throw new Error('Brief not found')
+      return updated
+    },
+
+    async setBriefNotionLink(id, pageId, source) {
+      const stored = pageId == null || pageId.trim() === '' ? null : parseNotionPageId(pageId)
+      if (pageId && pageId.trim() && !stored) throw new Error('Notion edit must be a Notion page link or id')
+      const updated = await saveBriefNotionLink(id, stored, source)
       if (!updated) throw new Error('Brief not found')
       return updated
     },

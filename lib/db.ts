@@ -54,6 +54,10 @@ export interface BriefRow {
   edited_by_client: boolean
   previous_snapshot: string | null
   edit_token_hash: string | null
+  /** Saved Prima Visual Edit page. Null when the brief is not linked. */
+  notion_edit_page_id: string | null
+  /** `auto` was chosen by matching. `manual` is a staff choice, including a cleared link. */
+  notion_edit_link: 'auto' | 'manual' | null
 }
 
 export interface NewBriefRecord {
@@ -134,6 +138,8 @@ async function migrateBriefs(): Promise<void> {
   await sql`ALTER TABLE briefs ADD COLUMN IF NOT EXISTS edited_by_client BOOLEAN NOT NULL DEFAULT FALSE`
   await sql`ALTER TABLE briefs ADD COLUMN IF NOT EXISTS previous_snapshot TEXT`
   await sql`ALTER TABLE briefs ADD COLUMN IF NOT EXISTS edit_token_hash TEXT`
+  await sql`ALTER TABLE briefs ADD COLUMN IF NOT EXISTS notion_edit_page_id TEXT`
+  await sql`ALTER TABLE briefs ADD COLUMN IF NOT EXISTS notion_edit_link TEXT`
 }
 
 function asIso(value: unknown): string {
@@ -164,7 +170,19 @@ export function mapBriefRow(row: Record<string, unknown>): BriefRow {
     edited_by_client: row.edited_by_client === true || row.edited_by_client === 't' || row.edited_by_client === 'true',
     previous_snapshot: (row.previous_snapshot as string | null) ?? null,
     edit_token_hash: (row.edit_token_hash as string | null) ?? null,
+    notion_edit_page_id: notionEditPageId(row.notion_edit_page_id),
+    notion_edit_link: notionEditLink(row.notion_edit_link),
   }
+}
+
+function notionEditPageId(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return trimmed || null
+}
+
+function notionEditLink(value: unknown): 'auto' | 'manual' | null {
+  return value === 'auto' || value === 'manual' ? value : null
 }
 
 // ---------------------------------------------------------------------------
@@ -320,5 +338,41 @@ export async function getBriefByEditTokenHash(tokenHash: string): Promise<BriefR
   await ensureTable()
   const sql = getSql()
   const rows = await sql`SELECT * FROM briefs WHERE edit_token_hash = ${tokenHash} LIMIT 1`
+  return rows[0] ? mapBriefRow(rows[0] as Record<string, unknown>) : null
+}
+
+/**
+ * Remember which Edit page belongs to a brief.
+ * An automatic link fills an empty slot and never replaces a staff choice.
+ * A manual link can set or clear the page.
+ */
+export async function saveBriefNotionLink(
+  id: number,
+  pageId: string | null,
+  source: 'auto' | 'manual',
+): Promise<BriefRow | null> {
+  await ensureTable()
+  const sql = getSql()
+  if (source === 'auto') {
+    if (!pageId) return getBriefById(id)
+    const rows = await sql`
+      UPDATE briefs
+      SET notion_edit_page_id = ${pageId},
+          notion_edit_link = 'auto'
+      WHERE id = ${id}
+        AND notion_edit_page_id IS NULL
+        AND notion_edit_link IS DISTINCT FROM 'manual'
+      RETURNING *
+    `
+    if (rows[0]) return mapBriefRow(rows[0] as Record<string, unknown>)
+    return getBriefById(id)
+  }
+  const rows = await sql`
+    UPDATE briefs
+    SET notion_edit_page_id = ${pageId},
+        notion_edit_link = 'manual'
+    WHERE id = ${id}
+    RETURNING *
+  `
   return rows[0] ? mapBriefRow(rows[0] as Record<string, unknown>) : null
 }

@@ -152,4 +152,9 @@ export interface PortalStore extends IngestStore {
   getBriefByEditTokenHash(tokenHash: string): Promise<BriefRow | null>
   createBriefRecord(row: NewBriefRecord): Promise<BriefRow>
   updateBriefRecord(id: number, patch: BriefUpdate): Promise<BriefRow>
+  /**
+   * Store the Edit page for a brief. `auto` fills an empty link only.
+   * `manual` sets or clears it and is kept on later automatic passes.
+   */
+  setBriefNotionLink(id: number, pageId: string | null, source: 'auto' | 'manual'): Promise<BriefRow>
 }

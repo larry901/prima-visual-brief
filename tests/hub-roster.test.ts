@@ -49,6 +49,8 @@ function brief(clientId: number, id: number): BriefRow {
     edited_by_client: false,
     previous_snapshot: null,
     edit_token_hash: null,
+    notion_edit_page_id: null,
+    notion_edit_link: null,
   }
 }
 

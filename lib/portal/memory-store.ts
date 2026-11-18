@@ -465,6 +465,8 @@ export class MemoryStore implements PortalStore {
       edited_by_client: false,
       previous_snapshot: null,
       edit_token_hash: row.edit_token_hash,
+      notion_edit_page_id: null,
+      notion_edit_link: null,
     }
     this.data.briefs.push(brief)
     return brief
@@ -487,6 +489,22 @@ export class MemoryStore implements PortalStore {
     brief.previous_snapshot = patch.previous_snapshot
     brief.edited_by_client = true
     brief.updated_at = patch.updated_at
+    return brief
+  }
+
+  async setBriefNotionLink(id: number, pageId: string | null, source: 'auto' | 'manual'): Promise<BriefRow> {
+    const brief = await this.getBriefById(id)
+    if (!brief) throw new Error('Brief not found')
+    const stored = pageId == null || pageId.trim() === '' ? null : parseNotionPageId(pageId)
+    if (pageId && pageId.trim() && !stored) throw new Error('Notion edit must be a Notion page link or id')
+    if (source === 'auto') {
+      if (!stored || brief.notion_edit_page_id || brief.notion_edit_link === 'manual') return brief
+      brief.notion_edit_page_id = stored
+      brief.notion_edit_link = 'auto'
+      return brief
+    }
+    brief.notion_edit_page_id = stored
+    brief.notion_edit_link = 'manual'
     return brief
   }
 }

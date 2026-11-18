@@ -37,6 +37,8 @@ export interface StaffEdit {
   turnaroundDays: number | null
   notionUrl: string
   lastEditedAt: string | null
+  /** Notion Clients pages on this edit. Used to match a brief. Empty when unknown. */
+  clientIds: string[]
 }
 
 export function notionPageUrl(pageId: string): string {
@@ -77,6 +79,7 @@ export function staffEditFromSnapshot(
     turnaroundDays,
     notionUrl: notionPageUrl(page.id),
     lastEditedAt: page.lastEditedAt,
+    clientIds: page.clientIds,
   }
 }
 
@@ -120,7 +123,7 @@ export function groupStaffEdits(edits: readonly StaffEdit[]): { status: string; 
 /** Sample board for local demo when Notion is not connected. Not used in production. */
 export function sampleStaffEdits(now: Date = new Date()): StaffEdit[] {
   const page = (id: string) => notionPageUrl(id)
-  return [
+  const rows: Array<Omit<StaffEdit, 'clientIds'>> = [
     {
       id: 'sample-queue',
       name: '1426 Cortlandt St',
@@ -206,4 +209,5 @@ export function sampleStaffEdits(now: Date = new Date()): StaffEdit[] {
       lastEditedAt: new Date(now.getTime() - 45 * 86_400_000).toISOString(),
     },
   ]
+  return rows.map((row) => ({ ...row, clientIds: [] }))
 }
