@@ -214,12 +214,30 @@ export function createNeonHubStore(): HubStore {
         id SERIAL PRIMARY KEY,
         email TEXT NOT NULL,
         token_hash TEXT NOT NULL UNIQUE,
+        code_hash TEXT,
+        code_salt TEXT,
+        code_attempts INTEGER NOT NULL DEFAULT 0,
+        code_used_at TIMESTAMPTZ,
         expires_at TIMESTAMPTZ NOT NULL,
         used_at TIMESTAMPTZ,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `
     await sql`CREATE INDEX IF NOT EXISTS hub_magic_links_email_idx ON hub_magic_links (email, created_at)`
+    // Existing databases already have hub_magic_links without the code columns.
+    // ADD COLUMN IF NOT EXISTS leaves current link rows usable; those columns start empty.
+    await sql`ALTER TABLE hub_magic_links ADD COLUMN IF NOT EXISTS code_hash TEXT`
+    await sql`ALTER TABLE hub_magic_links ADD COLUMN IF NOT EXISTS code_salt TEXT`
+    await sql`ALTER TABLE hub_magic_links ADD COLUMN IF NOT EXISTS code_attempts INTEGER NOT NULL DEFAULT 0`
+    await sql`ALTER TABLE hub_magic_links ADD COLUMN IF NOT EXISTS code_used_at TIMESTAMPTZ`
+    await sql`
+      CREATE TABLE IF NOT EXISTS hub_code_attempts (
+        id SERIAL PRIMARY KEY,
+        email TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS hub_code_attempts_email_idx ON hub_code_attempts (email, created_at)`
     await sql`
       CREATE TABLE IF NOT EXISTS hub_sessions (
         token_hash TEXT PRIMARY KEY,
@@ -562,12 +580,19 @@ export function createNeonHubStore(): HubStore {
       return Number((rows[0] as { count: number }).count ?? 0)
     },
 
-    async createStaffMagicLink(email, tokenHash, expiresAt, now: Date = new Date()) {
+    async createStaffMagicLink(email, tokenHash, expiresAt, code, now: Date = new Date()) {
       await ensureReady()
       const sql = sqlClient()
       await sql`
-        INSERT INTO hub_magic_links (email, token_hash, expires_at, created_at)
-        VALUES (${normalizeEmail(email)}, ${tokenHash}, ${expiresAt}, ${now.toISOString()})
+        INSERT INTO hub_magic_links (email, token_hash, code_hash, code_salt, expires_at, created_at)
+        VALUES (
+          ${normalizeEmail(email)},
+          ${tokenHash},
+          ${code.hash},
+          ${code.salt},
+          ${expiresAt},
+          ${now.toISOString()}
+        )
       `
     },
 
@@ -584,6 +609,87 @@ export function createNeonHubStore(): HubStore {
       `
       const email = (rows[0] as { email?: string } | undefined)?.email
       return email ? normalizeEmail(email) : null
+    },
+
+    async listActiveStaffCodes(email, nowIso, maxAttempts) {
+      await ensureReady()
+      const sql = sqlClient()
+      const rows = await sql`
+        SELECT id, code_hash, code_salt, code_attempts
+        FROM hub_magic_links
+        WHERE email = ${normalizeEmail(email)}
+          AND code_hash IS NOT NULL
+          AND code_salt IS NOT NULL
+          AND code_used_at IS NULL
+          AND expires_at > ${nowIso}
+          AND code_attempts < ${maxAttempts}
+        ORDER BY created_at DESC, id DESC
+      `
+      return (rows as { id: number; code_hash: string; code_salt: string; code_attempts: number }[]).map((row) => ({
+        id: Number(row.id),
+        codeHash: String(row.code_hash),
+        codeSalt: String(row.code_salt),
+        codeAttempts: Number(row.code_attempts),
+      }))
+    },
+
+    async incrementStaffCodeAttempts(id, maxAttempts) {
+      await ensureReady()
+      const sql = sqlClient()
+      const rows = await sql`
+        UPDATE hub_magic_links
+        SET code_attempts = code_attempts + 1
+        WHERE id = ${id}
+          AND code_used_at IS NULL
+          AND code_attempts < ${maxAttempts}
+        RETURNING id
+      `
+      return rows.length > 0
+    },
+
+    async consumeStaffCode(id, nowIso, maxAttempts) {
+      await ensureReady()
+      const sql = sqlClient()
+      const rows = await sql`
+        UPDATE hub_magic_links
+        SET code_used_at = ${nowIso}
+        WHERE id = ${id}
+          AND code_hash IS NOT NULL
+          AND code_used_at IS NULL
+          AND expires_at > ${nowIso}
+          AND code_attempts < ${maxAttempts}
+        RETURNING email
+      `
+      const email = (rows[0] as { email?: string } | undefined)?.email
+      return email ? normalizeEmail(email) : null
+    },
+
+    async countRecentCodeAttempts(email, sinceIso) {
+      await ensureReady()
+      const sql = sqlClient()
+      const rows = await sql`
+        SELECT COUNT(*)::int AS count
+        FROM hub_code_attempts
+        WHERE email = ${normalizeEmail(email)}
+          AND created_at >= ${sinceIso}
+      `
+      return Number((rows[0] as { count: number }).count ?? 0)
+    },
+
+    async recordCodeAttempt(email, nowIso, retainSinceIso) {
+      await ensureReady()
+      const sql = sqlClient()
+      await sql`DELETE FROM hub_code_attempts WHERE created_at < ${retainSinceIso}`
+      await sql`
+        INSERT INTO hub_code_attempts (email, created_at)
+        VALUES (${normalizeEmail(email)}, ${nowIso})
+      `
+    },
+
+    async clearCodeAttempts(email) {
+      await ensureReady()
+      const sql = sqlClient()
+      await sql`DELETE FROM hub_code_attempts WHERE email = ${normalizeEmail(email)}`
     },
 
     async createStaffSession(email, tokenHash, expiresAt) {

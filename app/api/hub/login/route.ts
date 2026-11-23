@@ -17,8 +17,9 @@ export async function POST(request: Request) {
     if (!result.ok) return Response.json({ error: result.error }, { status: result.status })
     return Response.json({
       ok: true,
-      message: 'If that email is on the staff list, a sign-in link is on its way.',
-      demoUrl: result.demoUrl,
+      message:
+        'If that email is on the staff list, a sign-in email is on its way. Enter the code from it below. The link in the email opens a browser and does not sign in this app.',
+      ...(result.demoUrl ? { demoUrl: result.demoUrl, demoCode: result.demoCode } : {}),
     })
   } catch (error) {
     console.error('Hub login failed:', error instanceof Error ? error.message : 'error')

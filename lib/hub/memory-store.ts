@@ -9,6 +9,7 @@ import {
   isTouchKind,
   type HubStore,
   type LeadPatch,
+  type StaffCodeRow,
   type LeadRecord,
   type NewLead,
   type NewTouch,
@@ -22,8 +23,17 @@ interface MagicLinkRow {
   id: number
   email: string
   tokenHash: string
+  codeHash: string | null
+  codeSalt: string | null
+  codeAttempts: number
+  codeUsedAt: string | null
   expiresAt: string
   usedAt: string | null
+  createdAt: string
+}
+
+interface SignInAttemptRow {
+  email: string
   createdAt: string
 }
 
@@ -40,6 +50,7 @@ export interface MemoryHubData {
   planPrices: Partial<Record<PlanSize, number>>
   clientPrices: [number, number][]
   magicLinks: MagicLinkRow[]
+  signInAttempts: SignInAttemptRow[]
   sessions: SessionRow[]
   wonDeals: WonDealRecord[]
   seq: { lead: number; event: number; touch: number; magic: number; deal: number }
@@ -53,6 +64,7 @@ export function emptyHubData(): MemoryHubData {
     planPrices: {},
     clientPrices: [],
     magicLinks: [],
+    signInAttempts: [],
     sessions: [],
     wonDeals: [],
     seq: { lead: 1, event: 1, touch: 1, magic: 1, deal: 1 },
@@ -106,6 +118,14 @@ export class MemoryHubStore implements HubStore {
     if (!Array.isArray(this.data.clientPrices)) this.data.clientPrices = []
     if (!this.data.planPrices) this.data.planPrices = {}
     if (!Array.isArray(this.data.magicLinks)) this.data.magicLinks = []
+    this.data.magicLinks = this.data.magicLinks.map((link) => ({
+      ...link,
+      codeHash: link.codeHash ?? null,
+      codeSalt: link.codeSalt ?? null,
+      codeAttempts: link.codeAttempts ?? 0,
+      codeUsedAt: link.codeUsedAt ?? null,
+    }))
+    if (!Array.isArray(this.data.signInAttempts)) this.data.signInAttempts = []
     if (!Array.isArray(this.data.sessions)) this.data.sessions = []
   }
 
@@ -262,11 +282,21 @@ export class MemoryHubStore implements HubStore {
     ).length
   }
 
-  async createStaffMagicLink(email: string, tokenHash: string, expiresAt: string, now: Date = new Date()): Promise<void> {
+  async createStaffMagicLink(
+    email: string,
+    tokenHash: string,
+    expiresAt: string,
+    code: { hash: string; salt: string },
+    now: Date = new Date(),
+  ): Promise<void> {
     this.data.magicLinks.push({
       id: this.data.seq.magic++,
       email: normalizeEmail(email),
       tokenHash,
+      codeHash: code.hash,
+      codeSalt: code.salt,
+      codeAttempts: 0,
+      codeUsedAt: null,
       expiresAt,
       usedAt: null,
       createdAt: now.toISOString(),
@@ -279,6 +309,64 @@ export class MemoryHubStore implements HubStore {
     if (new Date(link.expiresAt).getTime() <= new Date(nowIso).getTime()) return null
     link.usedAt = nowIso
     return link.email
+  }
+
+  async listActiveStaffCodes(email: string, nowIso: string, maxAttempts: number): Promise<StaffCodeRow[]> {
+    const norm = normalizeEmail(email)
+    const now = new Date(nowIso).getTime()
+    return this.data.magicLinks
+      .filter((link) =>
+        link.email === norm &&
+        link.codeHash &&
+        link.codeSalt &&
+        !link.codeUsedAt &&
+        link.codeAttempts < maxAttempts &&
+        new Date(link.expiresAt).getTime() > now,
+      )
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id - a.id)
+      .map((link) => ({
+        id: link.id,
+        codeHash: link.codeHash as string,
+        codeSalt: link.codeSalt as string,
+        codeAttempts: link.codeAttempts,
+      }))
+  }
+
+  async incrementStaffCodeAttempts(id: number, maxAttempts: number): Promise<boolean> {
+    const link = this.data.magicLinks.find((row) => row.id === id)
+    if (!link || link.codeUsedAt || link.codeAttempts >= maxAttempts) return false
+    link.codeAttempts += 1
+    return true
+  }
+
+  async consumeStaffCode(id: number, nowIso: string, maxAttempts: number): Promise<string | null> {
+    const link = this.data.magicLinks.find((row) => row.id === id)
+    if (!link || !link.codeHash || link.codeUsedAt) return null
+    if (link.codeAttempts >= maxAttempts) return null
+    if (new Date(link.expiresAt).getTime() <= new Date(nowIso).getTime()) return null
+    link.codeUsedAt = nowIso
+    return link.email
+  }
+
+  async countRecentCodeAttempts(email: string, sinceIso: string): Promise<number> {
+    const norm = normalizeEmail(email)
+    const since = new Date(sinceIso).getTime()
+    return this.data.signInAttempts.filter(
+      (row) => row.email === norm && new Date(row.createdAt).getTime() >= since,
+    ).length
+  }
+
+  async recordCodeAttempt(email: string, nowIso: string, retainSinceIso: string): Promise<void> {
+    const retain = new Date(retainSinceIso).getTime()
+    this.data.signInAttempts = this.data.signInAttempts.filter(
+      (row) => new Date(row.createdAt).getTime() >= retain,
+    )
+    this.data.signInAttempts.push({ email: normalizeEmail(email), createdAt: nowIso })
+  }
+
+  async clearCodeAttempts(email: string): Promise<void> {
+    const norm = normalizeEmail(email)
+    this.data.signInAttempts = this.data.signInAttempts.filter((row) => row.email !== norm)
   }
 
   async createStaffSession(email: string, tokenHash: string, expiresAt: string): Promise<void> {
