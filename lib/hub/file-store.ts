@@ -57,9 +57,17 @@ export function createFileHubStore(filePath: string): HubStore {
     setClientPrice: (clientId, monthlyDollars) => run((store) => store.setClientPrice(clientId, monthlyDollars)),
     releaseClient: (clientId) => run((store) => store.releaseClient(clientId)),
     countRecentStaffLinks: (email, sinceIso) => run((store) => store.countRecentStaffLinks(email, sinceIso)),
-    createStaffMagicLink: (email, tokenHash, expiresAt, now) =>
-      run((store) => store.createStaffMagicLink(email, tokenHash, expiresAt, now)),
+    createStaffMagicLink: (email, tokenHash, expiresAt, code, now) =>
+      run((store) => store.createStaffMagicLink(email, tokenHash, expiresAt, code, now)),
     consumeStaffMagicLink: (tokenHash, nowIso) => run((store) => store.consumeStaffMagicLink(tokenHash, nowIso)),
+    listActiveStaffCodes: (email, nowIso, maxAttempts) =>
+      run((store) => store.listActiveStaffCodes(email, nowIso, maxAttempts)),
+    incrementStaffCodeAttempts: (id, maxAttempts) => run((store) => store.incrementStaffCodeAttempts(id, maxAttempts)),
+    consumeStaffCode: (id, nowIso, maxAttempts) => run((store) => store.consumeStaffCode(id, nowIso, maxAttempts)),
+    countRecentCodeAttempts: (email, sinceIso) => run((store) => store.countRecentCodeAttempts(email, sinceIso)),
+    recordCodeAttempt: (email, nowIso, retainSinceIso) =>
+      run((store) => store.recordCodeAttempt(email, nowIso, retainSinceIso)),
+    clearCodeAttempts: (email) => run((store) => store.clearCodeAttempts(email)),
     createStaffSession: (email, tokenHash, expiresAt) =>
       run((store) => store.createStaffSession(email, tokenHash, expiresAt)),
     getStaffBySession: (tokenHash, nowIso) => run((store) => store.getStaffBySession(tokenHash, nowIso)),

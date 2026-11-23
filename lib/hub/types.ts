@@ -161,6 +161,14 @@ export interface NewTouch {
   note?: string
 }
 
+/** A sign-in code row. The raw code is never stored. */
+export interface StaffCodeRow {
+  id: number
+  codeHash: string
+  codeSalt: string
+  codeAttempts: number
+}
+
 export interface HubStore {
   ensureReady(): Promise<void>
   listLeads(): Promise<LeadRecord[]>
@@ -183,8 +191,22 @@ export interface HubStore {
    */
   releaseClient(clientId: number): Promise<void>
   countRecentStaffLinks(email: string, sinceIso: string): Promise<number>
-  createStaffMagicLink(email: string, tokenHash: string, expiresAt: string, now?: Date): Promise<void>
+  createStaffMagicLink(
+    email: string,
+    tokenHash: string,
+    expiresAt: string,
+    code: { hash: string; salt: string },
+    now?: Date,
+  ): Promise<void>
   consumeStaffMagicLink(tokenHash: string, nowIso: string): Promise<string | null>
+  /** Unexpired, unused codes for this email that are still under the attempt cap. Newest first. */
+  listActiveStaffCodes(email: string, nowIso: string, maxAttempts: number): Promise<StaffCodeRow[]>
+  incrementStaffCodeAttempts(id: number, maxAttempts: number): Promise<boolean>
+  /** Marks one code used. Returns the email, or null if it lost the race or was no longer valid. */
+  consumeStaffCode(id: number, nowIso: string, maxAttempts: number): Promise<string | null>
+  countRecentCodeAttempts(email: string, sinceIso: string): Promise<number>
+  recordCodeAttempt(email: string, nowIso: string, retainSinceIso: string): Promise<void>
+  clearCodeAttempts(email: string): Promise<void>
   createStaffSession(email: string, tokenHash: string, expiresAt: string): Promise<void>
   getStaffBySession(tokenHash: string, nowIso: string): Promise<string | null>
   deleteStaffSession(tokenHash: string): Promise<void>

@@ -546,6 +546,12 @@ body:has(.hub-root) {
   outline: 2px solid var(--hub-accent-text);
   border-color: var(--hub-accent-text);
 }
+.hub-code-input {
+  letter-spacing: 0.28em;
+  text-align: center;
+  font-weight: 700;
+  font-size: 24px;
+}
 .hub-label { display: grid; gap: 6px; font-size: 0.875rem; }
 .hub-error { color: #f2c1c1; font-size: 0.875rem; margin: 0; }
 .hub-note { color: #d4d4d4; font-size: 0.875rem; margin: 0; }

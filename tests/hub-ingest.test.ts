@@ -394,9 +394,14 @@ describe('staff allowlist', () => {
       assert.equal(hub.data.magicLinks.length, 0)
       const allowed = await requestStaffLink(hub, 'owner@example.com', 'https://brief.primavisual.io', NOW)
       assert.equal(allowed.ok, true)
-      if (allowed.ok) assert.match(allowed.demoUrl ?? '', /\/hub\/verify\?token=/)
+      if (allowed.ok) {
+        assert.match(allowed.demoUrl ?? '', /\/hub\/verify\?token=/)
+        assert.match(allowed.demoCode ?? '', /^\d{6}$/)
+        assert.equal(allowed.demoUrl?.includes(allowed.demoCode ?? 'missing'), false)
+      }
       assert.equal(hub.data.magicLinks.length, 1)
       assert.equal(hub.data.magicLinks[0].email, 'owner@example.com')
+      assert.notEqual(hub.data.magicLinks[0].codeHash, allowed.ok ? allowed.demoCode : '')
     } finally {
       if (original === undefined) delete process.env.STAFF_EMAILS
       else process.env.STAFF_EMAILS = original
