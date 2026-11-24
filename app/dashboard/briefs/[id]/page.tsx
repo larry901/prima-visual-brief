@@ -10,6 +10,8 @@ import TrackList from '@/app/dashboard/TrackList'
 import LogoutButton from '@/app/dashboard/LogoutButton'
 import DashboardNav from '@/app/dashboard/DashboardNav'
 import CopyForNotion from '@/app/dashboard/CopyForNotion'
+import ScriptPhotoGallery from '@/components/ScriptPhotoGallery'
+import { scriptPhotosFromDetail } from '@/lib/script-photos'
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-US', {
@@ -155,6 +157,7 @@ export default async function BriefDetailPage({ params }: { params: { id: string
             {videoTypes.map((type) => {
               const detail = videoDetails[type] || ({} as Partial<VideoDetail>)
               const tracks = detail.selectedTracks || []
+              const photos = scriptPhotosFromDetail(detail)
               return (
                 <div key={type} className="card overflow-hidden">
                   <div className="px-6 py-4 border-b border-brand-border bg-gray-50 flex items-center justify-between gap-3">
@@ -218,12 +221,15 @@ export default async function BriefDetailPage({ params }: { params: { id: string
                           </dd>
                         </div>
                       )}
-                      {detail.script && (
+                      {(detail.script || photos.length > 0) && (
                         <div>
                           <dt className="text-brand-muted mb-1">Script / talking points</dt>
-                          <dd className="font-medium whitespace-pre-wrap bg-gray-50 rounded-lg p-3 text-sm">
-                            {detail.script}
-                          </dd>
+                          {detail.script ? (
+                            <dd className="font-medium whitespace-pre-wrap bg-gray-50 rounded-lg p-3 text-sm">
+                              {detail.script}
+                            </dd>
+                          ) : null}
+                          {photos.length > 0 ? <ScriptPhotoGallery photos={photos} /> : null}
                         </div>
                       )}
                     </dl>

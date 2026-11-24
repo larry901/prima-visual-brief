@@ -7,6 +7,8 @@ import { readPortalClient } from '@/lib/portal/session'
 import { getPortalStore } from '@/lib/portal/store'
 import { changedBriefFields } from '@/lib/brief-logic'
 import type { BriefRow } from '@/lib/db'
+import ScriptPhotoGallery from '@/components/ScriptPhotoGallery'
+import { scriptPhotosFromDetail } from '@/lib/script-photos'
 
 export const dynamic = 'force-dynamic'
 
@@ -54,13 +56,18 @@ export default async function PortalBriefPage({ params }: { params: { id: string
           <section className="portal-block">
             <h2>Videos</h2>
             <ul className="portal-brief-list">
-              {details.videoTypes.map((type) => (
-                <li key={type} className="portal-brief-card">
-                  <p className="portal-film-label">{type}</p>
-                  {details.videoDetails[type]?.highlights && <p>{details.videoDetails[type].highlights}</p>}
-                  {details.videoDetails[type]?.script && <p>{details.videoDetails[type].script}</p>}
-                </li>
-              ))}
+              {details.videoTypes.map((type) => {
+                const detail = details.videoDetails[type]
+                const photos = scriptPhotosFromDetail(detail)
+                return (
+                  <li key={type} className="portal-brief-card">
+                    <p className="portal-film-label">{type}</p>
+                    {detail?.highlights && <p>{detail.highlights}</p>}
+                    {detail?.script && <p>{detail.script}</p>}
+                    {photos.length > 0 ? <ScriptPhotoGallery photos={photos} /> : null}
+                  </li>
+                )
+              })}
             </ul>
           </section>
           {details.driveLink && (

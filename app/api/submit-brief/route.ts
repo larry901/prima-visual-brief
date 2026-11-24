@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sendBriefEmail } from '@/lib/email'
+import { sanitizeVideoDetails } from '@/lib/script-photos'
 import { readPortalClient } from '@/lib/portal/session'
 import { getPortalStore } from '@/lib/portal/store'
 import { hashToken, newToken } from '@/lib/portal/tokens'
+import type { VideoDetail } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,6 +46,7 @@ export async function POST(req: NextRequest) {
     const submittedEmail = emailOrNull(clientEmail)
     const clientEmailStored = sessionClient?.email ?? submittedEmail
     const editToken = newToken()
+    const details = sanitizeVideoDetails(videoDetails)
 
     const brief = await store.createBriefRecord({
       client_name: clientEmailStored ?? '',
@@ -57,7 +60,7 @@ export async function POST(req: NextRequest) {
       lockbox_code: lockboxCode || null,
       access_notes: accessNotes || null,
       video_types: JSON.stringify(videoTypes),
-      video_details: JSON.stringify(videoDetails || {}),
+      video_details: JSON.stringify(details),
       drive_link: driveLink || null,
       asset_notes: assetNotes || null,
       file_paths: '[]',
@@ -74,7 +77,7 @@ export async function POST(req: NextRequest) {
       lockboxCode,
       accessNotes,
       videoTypes,
-      videoDetails: videoDetails || {},
+      videoDetails: details as unknown as Record<string, VideoDetail>,
       driveLink,
       assetNotes,
       fileNames: [],

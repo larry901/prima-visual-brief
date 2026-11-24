@@ -1,5 +1,23 @@
 import { Resend } from 'resend'
 import { VideoDetail } from './db'
+import { scriptPhotosFromDetail } from './script-photos'
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+export function referencePhotosHtml(detail: Partial<VideoDetail> | unknown): string {
+  const photos = scriptPhotosFromDetail(detail)
+  if (photos.length === 0) return ''
+  const links = photos
+    .map((photo) => `<a href="${escapeHtml(photo.url)}">${escapeHtml(photo.name)}</a>`)
+    .join('<br>')
+  return `<p><strong>Reference photos:</strong><br>${links}</p>`
+}
 
 function resendClient() {
   const key = process.env.EMAIL_API_KEY
@@ -43,6 +61,7 @@ export async function sendBriefEmail(data: BriefEmailData) {
         ${detail.inspirationLinks?.length ? `<p><strong>Inspiration Links:</strong><br>${detail.inspirationLinks.map((l) => `<a href="${l}">${l}</a>`).join('<br>')}</p>` : ''}
         ${detail.inspirationThoughts ? `<p><strong>What they love about examples:</strong> ${detail.inspirationThoughts}</p>` : ''}
         ${detail.script ? `<p><strong>Script / Talking Points:</strong> ${detail.script}</p>` : ''}
+        ${referencePhotosHtml(detail)}
       </div>
     `
   }).join('')

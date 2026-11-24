@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { fieldsChanged } from '@/lib/brief-service'
 import { assertCanEdit, briefSnapshot, shootStartsForClient } from '@/lib/brief-service'
 import { sendBriefEmail } from '@/lib/email'
+import { deleteUnreferencedScriptPhotos } from '@/lib/script-photo-blobs'
+import { droppedScriptPhotoUrls, sanitizeVideoDetails } from '@/lib/script-photos'
 import { readPortalClient } from '@/lib/portal/session'
 import { getPortalStore } from '@/lib/portal/store'
 import { hashToken } from '@/lib/portal/tokens'
@@ -36,6 +38,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
+    const details = sanitizeVideoDetails(body.videoDetails)
     const next = {
       agent_name: agentName,
       property_address: propertyAddress,
@@ -45,16 +48,19 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       lockbox_code: body.lockboxCode ? String(body.lockboxCode) : null,
       access_notes: body.accessNotes ? String(body.accessNotes) : null,
       video_types: JSON.stringify(videoTypes),
-      video_details: JSON.stringify(body.videoDetails || {}),
+      video_details: JSON.stringify(details),
       drive_link: body.driveLink ? String(body.driveLink) : null,
       asset_notes: body.assetNotes ? String(body.assetNotes) : null,
     }
     const changedFields = fieldsChanged(brief, next)
+    const removedPhotos = droppedScriptPhotoUrls(brief.video_details, next.video_details)
     const updated = await store.updateBriefRecord(id, {
       ...next,
       previous_snapshot: briefSnapshot(brief),
       updated_at: new Date().toISOString(),
     })
+    if (!updated) return NextResponse.json({ error: 'Update failed' }, { status: 500 })
+    await deleteUnreferencedScriptPhotos(removedPhotos)
 
     if (changedFields.length > 0) {
       const details = JSON.parse(updated.video_details || '{}') as Record<string, VideoDetail>

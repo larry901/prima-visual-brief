@@ -5,7 +5,7 @@ A full-stack Next.js 14 web application for collecting pre-shoot creative briefs
 ## Features
 
 - Multi-section brief form with conditional video detail sections
-- File uploads (local disk or S3-compatible storage)
+- Reference photos on each video's script, stored in Vercel Blob
 - Email notifications via Resend on every submission
 - Spotify track suggestions based on music vibe selections (dashboard only)
 - Password-protected dashboard to view all submitted briefs
@@ -51,6 +51,7 @@ cp .env.local.example .env.local
 | `STAFF_EMAILS` | For the hub | Comma-separated staff inboxes that can request a Prima Hub sign-in email. Do not commit real addresses. The dashboard password still opens the hub if this is unset. |
 | `PORTAL_DEMO_SEED` | No | Set to `true` locally or on a preview deployment to load fictional `@example.com` clients and to show their sign-in links on screen. Leave unset in production. |
 | `NOTION_TOKEN` | No | Read-only internal integration token for the Prima Visual Edit database. When set, a linked client sees Video progress on `/portal`, and Clients can pick a Notion page. When unset, or if Notion errors, that section is hidden. |
+| `BLOB_READ_WRITE_TOKEN` | For reference photos | Read-write token for a **public** Vercel Blob store. Clients attach screenshots to each video's script. When unset, the rest of the brief still submits. Do not commit the token. |
 
 ### Setting up Neon Postgres
 
@@ -92,7 +93,7 @@ To click through the portal without a real inbox, set `PORTAL_DEMO_SEED=true`. S
 npm test
 ```
 
-File uploads go to `public/uploads/` by default.
+Reference photos upload to Vercel Blob when `BLOB_READ_WRITE_TOKEN` is set. Without it, the form still submits and explains that photos are not configured.
 
 ## Building for Production
 
@@ -114,15 +115,16 @@ npm start
    - `NOTION_TOKEN` (optional; leave unset until the integration is ready)
 5. Deploy
 
-### File Uploads on Vercel
+### Reference photos (Vercel Blob)
 
-Vercel has an ephemeral filesystem — locally uploaded files will not persist between deployments or function invocations. Configure S3-compatible storage for production:
+Script screenshots are stored in a public Vercel Blob store so each photo has a stable `https://<store>.public.blob.vercel-storage.com/...` URL. Notion can embed that URL as an external image. The store is included on the Hobby plan up to 1 GB storage, 10,000 simple operations, 2,000 advanced operations, and 10 GB of data transfer per month. Hobby does not bill past those limits; Blob pauses until the monthly window resets.
 
-- **AWS S3**: Set `STORAGE_BUCKET`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`
-- **Cloudflare R2**: Set all the above plus `AWS_ENDPOINT_URL=https://<account-id>.r2.cloudflarestorage.com`
-- **MinIO or other**: Set `AWS_ENDPOINT_URL` to your endpoint
+1. In the Vercel project, create a **public** Blob store (Storage → Create → Blob). A private store has no public URL, so Notion cannot fetch the image.
+2. Connect the store to this project for Production, Preview, and Development.
+3. When connecting, add the read-write token. Client uploads need `BLOB_READ_WRITE_TOKEN` (OIDC alone cannot mint the browser upload token).
+4. Redeploy. For local uploads, pull env into `.env.local`. Do not commit the token.
 
-The `@aws-sdk/client-s3` package is dynamically imported at runtime only when S3 is configured, so it does not need to be installed for local development.
+`GET /api/dashboard/briefs/:id` returns `scriptPhotos`, a map of video type to `{ url, name }`, plus the same urls inside `brief.video_details`. Copy for Notion includes each photo as a markdown image.
 
 ## Client portal
 

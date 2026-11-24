@@ -16,6 +16,8 @@ import { notionPageUrl } from '@/lib/hub/edits'
 import { requireHubPage } from '@/lib/hub/session'
 import { ensureDemoSeed } from '@/lib/portal/seed'
 import { getPortalStore } from '@/lib/portal/store'
+import ScriptPhotoGallery from '@/components/ScriptPhotoGallery'
+import { scriptPhotosFromDetail } from '@/lib/script-photos'
 
 export const dynamic = 'force-dynamic'
 
@@ -228,6 +230,7 @@ function VideoBlock({ type, detail }: { type: string; detail: Partial<VideoDetai
     ? detail.selectedTracks.filter((track) => track && typeof track === 'object')
     : []
   const links = Array.isArray(detail.inspirationLinks) ? detail.inspirationLinks.filter((link) => typeof link === 'string') : []
+  const photos = scriptPhotosFromDetail(detail)
   return (
     <section className="hub-card">
       <h2>{type}</h2>
@@ -273,10 +276,11 @@ function VideoBlock({ type, detail }: { type: string; detail: Partial<VideoDetai
             <dd className="hub-prose">{detail.inspirationThoughts}</dd>
           </div>
         ) : null}
-        {detail.script ? (
+        {detail.script || photos.length > 0 ? (
           <div>
             <dt>Script / talking points</dt>
-            <dd className="hub-prose">{detail.script}</dd>
+            {detail.script ? <dd className="hub-prose">{detail.script}</dd> : null}
+            <ScriptPhotoGallery photos={photos} />
           </div>
         ) : null}
       </dl>

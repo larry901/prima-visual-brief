@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import VideoSection, { VideoDetailState } from './VideoSection'
 
 const VIDEO_TYPES = [
@@ -18,6 +18,7 @@ const defaultVideoDetail = (): VideoDetailState => ({
   inspirationLinks: [],
   inspirationThoughts: '',
   script: '',
+  scriptPhotos: [],
 })
 
 export default function BriefForm({
@@ -64,7 +65,19 @@ export default function BriefForm({
   const [videoDetails, setVideoDetails] = useState<Record<string, VideoDetailState>>(prefill?.videoDetails ?? {})
   const [driveLink, setDriveLink] = useState(prefill?.driveLink ?? '')
   const [assetNotes, setAssetNotes] = useState(prefill?.assetNotes ?? '')
+  const [uploadingTypes, setUploadingTypes] = useState<Record<string, boolean>>({})
   const email = prefill?.email ?? initialEmail
+  const photosUploading = Object.values(uploadingTypes).some(Boolean)
+
+  const markPhotoUpload = useCallback((type: string, uploading: boolean) => {
+    setUploadingTypes((current) => {
+      if (Boolean(current[type]) === uploading) return current
+      const next = { ...current }
+      if (uploading) next[type] = true
+      else delete next[type]
+      return next
+    })
+  }, [])
 
   const toggleVideoType = (type: string) => {
     if (selectedVideoTypes.includes(type)) {
@@ -84,6 +97,11 @@ export default function BriefForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+
+    if (photosUploading) {
+      setError('Wait for the photos to finish uploading, then submit.')
+      return
+    }
 
     if (selectedVideoTypes.length === 0) {
       setError('Please select at least one video type in Section 3 before submitting.')
@@ -327,6 +345,7 @@ export default function BriefForm({
                     type={type}
                     detail={videoDetails[type] || defaultVideoDetail()}
                     onChange={(d) => updateVideoDetail(type, d)}
+                    onPhotoUploading={(uploading) => markPhotoUpload(type, uploading)}
                   />
                 </div>
               </div>
@@ -368,10 +387,10 @@ export default function BriefForm({
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || photosUploading}
             className="w-full btn-primary py-4 text-base disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Saving\u2026' : edit ? 'Save changes' : 'Submit Creative Brief'}
+            {photosUploading ? 'Uploading photos\u2026' : loading ? 'Saving\u2026' : edit ? 'Save changes' : 'Submit Creative Brief'}
           </button>
         </form>
       </div>
