@@ -44,7 +44,16 @@ export interface PortalView {
   frameioUrl: string | null
   /** Merged scheduler URL for this client only. Null when a subscription client has no private link. */
   bookingUrl: string | null
+  /**
+   * General brief link. Uses the next counted shoot date when one is on the calendar,
+   * including when that shoot already has a brief.
+   */
   briefHref: string
+  /**
+   * Earliest upcoming shoot that still has no brief. Null when every upcoming
+   * shoot already has one, so the portal banner stays hidden.
+   */
+  briefNeeded: PortalAppointmentView | null
 }
 
 function shootDate(startAt: string): string {
@@ -109,6 +118,7 @@ export async function loadPortalView(
     .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime())
     .map(toView)
   const next = nextShoot(visible, countedTypes, now)
+  const briefNeeded = upcoming.find((appointment) => appointment.needsBrief) ?? null
   return {
     name: client.name,
     email: client.email,
@@ -134,5 +144,6 @@ export async function loadPortalView(
       email: client.email,
       shootDate: next ? shootDate(next.startAt) : null,
     }),
+    briefNeeded,
   }
 }

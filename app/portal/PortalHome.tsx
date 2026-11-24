@@ -15,7 +15,6 @@ export default function PortalHome({
   videos: VideoProgressItem[] | null
 }) {
   const firstName = view.name.split(/\s+/)[0] || view.name
-  const needsBrief = view.upcoming.some((appointment) => appointment.needsBrief)
 
   return (
     <main className="portal-shell">
@@ -30,8 +29,8 @@ export default function PortalHome({
           <h1>{firstName}</h1>
           {view.company && <p className="portal-company">{view.company}</p>}
 
-          {needsBrief && (
-            <a className="portal-banner" href={view.nextShoot?.needsBrief ? view.nextShoot.briefHref : view.briefHref}>
+          {view.briefNeeded && (
+            <a className="portal-banner" href={view.briefNeeded.briefHref}>
               <span className="portal-kicker">Before the shoot</span>
               <strong>Fill out your creative brief</strong>
               <span>The crew needs it at least 24 hours ahead.</span>
