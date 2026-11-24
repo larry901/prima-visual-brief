@@ -1,4 +1,5 @@
 import { neon } from '@neondatabase/serverless'
+import type { ScriptPhoto } from './script-photos'
 
 // ---------------------------------------------------------------------------
 // Connection — module-level singleton, safe across serverless invocations
@@ -30,6 +31,8 @@ export interface VideoDetail {
   inspirationLinks: string[]
   inspirationThoughts: string
   script: string
+  /** Public Blob URLs for screenshots attached to the script. Absent on older briefs. */
+  scriptPhotos?: ScriptPhoto[]
 }
 
 export interface BriefRow {

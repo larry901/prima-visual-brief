@@ -1,5 +1,7 @@
 'use client'
+import type { ScriptPhoto } from '@/lib/script-photos'
 import InspirationLinks from './InspirationLinks'
+import ScriptPhotos from './ScriptPhotos'
 import SuggestedSongs, { TrackRef } from './SuggestedSongs'
 
 export interface VideoDetailState {
@@ -10,21 +12,23 @@ export interface VideoDetailState {
   inspirationLinks: string[]
   inspirationThoughts: string
   script: string
+  scriptPhotos?: ScriptPhoto[]
 }
 
 interface VideoSectionProps {
   type: string
   detail: VideoDetailState
   onChange: (detail: VideoDetailState) => void
+  onPhotoUploading?: (uploading: boolean) => void
 }
 
-export default function VideoSection({ type, detail, onChange }: VideoSectionProps) {
+export default function VideoSection({ type, detail, onChange, onPhotoUploading }: VideoSectionProps) {
   const update = <K extends keyof VideoDetailState>(field: K, value: VideoDetailState[K]) => {
     onChange({ ...detail, [field]: value })
   }
 
   return (
-    <div className="space-y-5 pt-2">
+    <div className="space-y-5 pt-2" data-video-type={type}>
       {/* PRIMARY: Vision / Script — placed first, visually emphasized, required */}
       <div className="-mx-6 -mt-8 px-6 pt-6 pb-6 bg-brand-dark/[0.03] border-y-2 border-brand-dark/10">
         <div className="flex items-baseline justify-between mb-1.5">
@@ -52,6 +56,11 @@ export default function VideoSection({ type, detail, onChange }: VideoSectionPro
 • A script, voiceover lines, or talking points if you have them
 • Anything else that's in your head about how this should look or feel`}
           className="input resize-y text-sm leading-relaxed bg-white"
+        />
+        <ScriptPhotos
+          photos={detail.scriptPhotos ?? []}
+          onChange={(scriptPhotos) => update('scriptPhotos', scriptPhotos)}
+          onUploadingChange={onPhotoUploading}
         />
       </div>
 
