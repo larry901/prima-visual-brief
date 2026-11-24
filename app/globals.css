@@ -31,10 +31,12 @@
   }
 }
 
-/* Client portal. Scoped so the brief form and dashboard keep their own type.
-   Accent lives on these variables: change --portal-accent, --portal-accent-rgb,
-   --portal-accent-text, and --portal-on-accent together. #000 on #435A57 is
-   2.84:1, so fills use white text. Small accent text on black uses #839290 (~6.5:1). */
+/* Client portal. Heading type stays on .portal-shell so the light brief form
+   (and its confirmation) keeps Playfair and dark ink when a portal route
+   renders it. Accent lives on these variables: change --portal-accent,
+   --portal-accent-rgb, --portal-accent-text, and --portal-on-accent together.
+   #000 on #435A57 is 2.84:1, so fills use white text. Small accent text on
+   black uses #839290 (~6.5:1). */
 .portal {
   --portal-accent: #435A57;
   --portal-accent-rgb: 67, 90, 87;
@@ -47,16 +49,22 @@
   font-family: Inter, system-ui, sans-serif;
   font-weight: 400;
 }
-.portal h1,
-.portal h2,
-.portal h3 {
+.portal-shell h1,
+.portal-shell h2,
+.portal-shell h3 {
   font-family: Montserrat, Inter, sans-serif;
   font-weight: 700;
   letter-spacing: -0.03em;
   color: #ffffff;
 }
-.portal h1 { font-size: clamp(2.4rem, 6vw, 4rem); line-height: 0.95; }
-.portal h2 { font-size: 1.35rem; margin-bottom: 0.75rem; }
+.portal-shell h1 { font-size: clamp(2.4rem, 6vw, 4rem); line-height: 0.95; }
+.portal-shell h2 { font-size: 1.35rem; margin-bottom: 0.75rem; }
+
+/* Light sheet for the creative brief. Portal text is white; this restores
+   the ink color on the form and the "Brief updated" confirmation. */
+.brief-sheet {
+  color: #1A1A1A;
+}
 .portal-films h2 { font-size: clamp(1.85rem, 5vw, 2.5rem); margin-bottom: 8px; letter-spacing: -0.04em; }
 .portal-shell { min-height: 100vh; }
 .portal-top {
