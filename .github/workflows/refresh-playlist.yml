@@ -1,0 +1,60 @@
+# Opt-in playlist refresh. Nothing fetches Spotify until someone runs this
+# workflow by hand, or sets the repository variable PLAYLIST_REFRESH to the
+# exact string "true" (Settings → Secrets and variables → Actions → Variables).
+# Until that variable is set, the Monday schedule skips the job.
+#
+# The job rebuilds data/playlist-tracks.json with `npm run refresh:playlist`
+# and opens a pull request when the file changes. It does not push to main.
+#
+# Playability follows the runner's country. GitHub-hosted runners are not
+# pinned to the US, so a scheduled run can drop or restore country-restricted
+# tracks compared with a refresh run from the US. The old API sync used
+# market=US. Prefer workflow_dispatch from a known network when that matters.
+
+name: Refresh playlist
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 15 * * 1'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh:
+    if: github.event_name == 'workflow_dispatch' || vars.PLAYLIST_REFRESH == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - name: Refresh the snapshot
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run --silent refresh:playlist | tee /tmp/playlist-refresh.txt
+      - name: Open a pull request when tracks changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet -- data/playlist-tracks.json; then
+            echo "Playlist file unchanged."
+            exit 0
+          fi
+          branch="playlist-refresh-$(date -u +%Y%m%d-%H%M)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add data/playlist-tracks.json
+          git commit -m "Refresh reference playlist tracks"
+          git push -u origin "$branch"
+          gh pr create \
+            --base main \
+            --head "$branch" \
+            --title "Refresh reference playlist tracks" \
+            --body-file /tmp/playlist-refresh.txt
